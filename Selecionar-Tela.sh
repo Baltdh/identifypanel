@@ -1,5 +1,5 @@
 #!/bin/sh
-# IdentifyPanel — menu shell interativo para selecionar DTBOs locais.
+# IdentifyPanel — seletor com tentativa pendente, confirmação visual e rollback manual.
 # Uso: ./Selecionar-Tela.sh [raiz-da-particao-ROCKNIX]
 set -eu
 
@@ -9,13 +9,12 @@ APP="$HERE/identifypanel.py"
 PROFILES="$HERE/profiles/official"
 
 if ! command -v "$PYTHON" >/dev/null 2>&1; then
-    echo "ERRO: Python 3 é necessário para validar e instalar o DTBO."
+    echo "ERRO: Python 3 é necessário para validar, testar e restaurar DTBOs."
     echo "Nenhum arquivo foi alterado."
     exit 1
 fi
-
 if [ ! -f "$APP" ] || [ ! -d "$PROFILES" ]; then
-    echo "ERRO: estrutura do pacote IdentifyPanel incompleta."
+    echo "ERRO: pacote incompleto. Mantenha identifypanel.py e profiles/official juntos."
     exit 1
 fi
 
@@ -37,9 +36,15 @@ if [ ! -d "$BOOT" ]; then
     exit 1
 fi
 
-LIST="$HERE/.identifypanel-menu-list"
-trap 'rm -f "$LIST"' EXIT HUP INT TERM
+LIST="${TMPDIR:-/tmp}/identifypanel-menu-$$"
+trap 'rm -f "$LIST"' 0
+trap 'exit 130' HUP INT TERM
 find "$PROFILES" -type f \( -name '*.dtbo' -o -name '*.dtbo.*' \) -print | sort > "$LIST"
+
+if [ ! -s "$LIST" ]; then
+    echo "Nenhum DTBO encontrado em $PROFILES."
+    exit 1
+fi
 
 while :; do
     echo
@@ -47,6 +52,11 @@ while :; do
     echo "       IDENTIFYPANEL — R36H"
     echo "======================================"
     echo "Partição ROCKNIX: $BOOT"
+    echo
+    "$PYTHON" "$APP" status --boot "$BOOT" || {
+        echo "Não foi possível ler o estado do teste."
+        exit 1
+    }
     echo
     echo "Perfis locais disponíveis:"
     n=0
@@ -56,17 +66,35 @@ while :; do
         printf " %2d) %s\n" "$n" "${file##*/}"
     done < "$LIST"
     echo
-    echo " R) Restaurar overlay original"
+    echo " C) Confirmar perfil pendente (somente após ver a imagem funcionando)"
+    echo " F) Rejeitar teste e restaurar o overlay anterior"
+    echo " R) Restaurar o overlay original anterior ao IdentifyPanel"
     echo " 0) Sair"
-    printf "Escolha o número do perfil: "
+    printf "Escolha o número do perfil ou uma ação: "
     IFS= read -r choice
 
     case "$choice" in
         0) exit 0 ;;
+        C|c)
+            if "$PYTHON" "$APP" confirm --boot "$BOOT"; then
+                echo "Confirmação registrada. O perfil agora está marcado como confirmado."
+            else
+                echo "Não foi possível confirmar. O estado pendente foi preservado."
+            fi
+            ;;
+        F|f)
+            if "$PYTHON" "$APP" rollback --boot "$BOOT"; then
+                echo "Rollback concluído. Reinicie para carregar o overlay anterior."
+            else
+                echo "Rollback não concluído. Preserve o cartão e consulte o diagnóstico."
+            fi
+            ;;
         R|r)
-            "$PYTHON" "$APP" restore --boot "$BOOT"
-            echo
-            echo "Restauração concluída. Reinicie o console para carregar o overlay restaurado."
+            if "$PYTHON" "$APP" restore --boot "$BOOT"; then
+                echo "Reinicie para carregar o overlay original restaurado."
+            else
+                echo "Restauração não concluída. Preserve o cartão e consulte o diagnóstico."
+            fi
             ;;
         ''|*[!0-9]*)
             echo "Opção inválida."
@@ -79,20 +107,25 @@ while :; do
             fi
             echo
             echo "Perfil escolhido: ${selected##*/}"
-            echo "O overlay ativo será substituído por uma cópia deste DTBO."
-            echo "O arquivo original do catálogo não será renomeado nem modificado."
-            printf "Digite APLICAR para confirmar: "
+            echo "O perfil será apenas um TESTE PENDENTE; não será definitivo agora."
+            echo "A cópia do catálogo não será alterada. O overlay anterior e o original"
+            echo "serão preservados para permitir rollback quando o sistema voltar a iniciar."
+            printf "Digite TESTAR para preparar este perfil para o próximo boot: "
             IFS= read -r confirm
-            if [ "$confirm" != "APLICAR" ]; then
+            if [ "$confirm" != "TESTAR" ]; then
                 echo "Cancelado; nenhum arquivo foi alterado."
                 continue
             fi
-            "$PYTHON" "$APP" apply --boot "$BOOT" --dtbo "$selected" --name "${selected##*/}"
+            "$PYTHON" "$APP" stage --boot "$BOOT" --dtbo "$selected" --name "${selected##*/}"
             echo
-            echo "Perfil instalado. Reinicie o R36H para testar a tela."
-            echo "Se a imagem funcionar, pare aqui. Se não funcionar, recupere o acesso,"
-            echo "abra novamente este menu e escolha outro perfil."
-            printf "Pressione Enter para voltar ao menu (não reinicia automaticamente). "
+            echo "Agora reinicie o R36H e verifique a imagem."
+            echo "Se a imagem aparecer corretamente, volte aqui e use C para confirmar."
+            echo "Se o sistema iniciar mas a imagem estiver ruim, use F para desfazer"
+            echo "e depois selecione o próximo perfil."
+            echo "Se o kernel travar ou a tela ficar preta antes do menu abrir, este script"
+            echo "não consegue executar: será preciso recuperar a partição por outro sistema"
+            echo "ou leitor de cartão. Reset sozinho não executa rollback pré-boot."
+            printf "Pressione Enter para voltar ao menu. "
             IFS= read -r _
             ;;
     esac
