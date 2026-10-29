@@ -1,53 +1,71 @@
 # IdentifyPanel / AutoPanel
 
-Ferramenta para diagnóstico e seleção local de overlays LCD em handhelds ROCKNIX baseados em RK3326.
+Ferramenta offline para inspecionar e testar overlays LCD no ROCKNIX, com foco experimental no R36H.
 
 ## Pacote offline
 
-O workflow **Build offline IdentifyPanel package** baixa os DTBOs publicados que passam na validação estrutural, grava-os em `profiles/official` na branch e monta um ZIP offline com o menu Shell, o instalador e o manifesto com hashes.
+O workflow **Build offline IdentifyPanel package** baixa os DTBOs publicados que passam na validação estrutural, salva os hashes e monta o ZIP offline.
 
-Para gerar o pacote:
-1. Abra **Actions** no repositório.
-2. Selecione **Build offline IdentifyPanel package**.
-3. Clique em **Run workflow** e escolha a branch `autopanel-core`.
-4. Ao terminar, baixe o artefato **IdentifyPanel-Offline-R36H**.
+1. Abra **Actions** neste repositório.
+2. Escolha **Build offline IdentifyPanel package**.
+3. Clique em **Run workflow** e selecione a branch `autopanel-core`.
+4. Aguarde a execução terminar com sucesso e baixe o artefato `IdentifyPanel-Offline-R36H`.
+5. Extraia a pasta completa, sem separar `identifypanel.py`, `Selecionar-Tela.sh` e `profiles/official`.
 
-## Menu Shell de seleção de tela
+A validação estrutural confirma apenas que o arquivo tem uma estrutura FDT plausível. Ela não comprova compatibilidade elétrica ou de temporização com o R36H.
 
-O pacote inclui `Selecionar-Tela.sh`, um menu simples que lista os DTBOs encontrados na própria pasta `profiles/official`. O usuário escolhe o perfil; o instalador valida o FDT, faz backup do overlay anterior e instala uma cópia como `overlays/mipi-panel.dtbo`.
+## Fluxo de teste sugerido
 
-Exemplo:
+**Preserve o cartão DarkOS que funciona.** Use um cartão ROCKNIX de teste e guarde uma cópia da pasta `stock` e do overlay original antes de começar.
+
+No ROCKNIX, abra um terminal na pasta extraída:
 
 ```sh
-cd /CAMINHO/IdentifyPanel-Offline
 ./Selecionar-Tela.sh /CAMINHO/DA/PARTICAO-ROCKNIX
 ```
 
-Se a raiz da partição for omitida, o script tenta localizar os caminhos comuns `/flash`, `/storage/ROCKNIX` e `/ROCKNIX`; se não encontrar, solicita o caminho. O menu oferece:
-- Número do perfil: aplicar esse DTBO.
-- `R`: restaurar o overlay que estava presente antes do primeiro teste (ou restaurar a ausência, se não havia overlay).
-- `0`: sair sem alterar arquivos.
+Se o caminho não for informado, o script tenta localizar os caminhos comuns `/flash`, `/storage/ROCKNIX` e `/ROCKNIX`, e depois pergunta o caminho manualmente. O programa exige Python 3 e permissão de escrita na partição.
 
-Requisitos: Shell POSIX/BusyBox, Python 3 e permissões de escrita na partição ROCKNIX. O workflow verifica a sintaxe do Shell com `sh -n`.
+1. Selecione um único perfil e digite `TESTAR`.
+2. O perfil será instalado como `overlays/mipi-panel.dtbo`, com estado **pendente**, para ser carregado no próximo boot.
+3. Reinicie e verifique a imagem fisicamente.
+4. Se a imagem estiver correta, abra o menu e use **C** para confirmar. Só então o perfil fica registrado como confirmado.
+5. Se o sistema iniciar, mas a imagem estiver errada, use **F** para desfazer o teste; reinicie para carregar o overlay anterior e então teste outro perfil.
+6. Use **R** para voltar ao overlay capturado antes da primeira tentativa.
 
-## Procedimento de teste
+O pacote também aceita os comandos diretos:
 
-1. Inicie o ROCKNIX e abra um terminal.
-2. Execute o menu.
-3. Escolha um único perfil e confirme.
-4. Reinicie o R36H e observe se a imagem aparece.
-5. Se funcionar, mantenha esse perfil. Se não funcionar, recupere o acesso ao armazenamento, abra o menu novamente e escolha outro perfil.
-6. Se necessário, use `R` para restaurar o overlay original.
+```sh
+python3 identifypanel.py status --boot /CAMINHO/DA/PARTICAO-ROCKNIX
+python3 identifypanel.py confirm --boot /CAMINHO/DA/PARTICAO-ROCKNIX
+python3 identifypanel.py rollback --boot /CAMINHO/DA/PARTICAO-ROCKNIX
+python3 identifypanel.py restore --boot /CAMINHO/DA/PARTICAO-ROCKNIX
+```
 
-**Limitação importante:** o menu é executado depois que o ROCKNIX inicia. Se um DTBO causar tela preta, o menu não poderá ser aberto naquela inicialização. Para recuperação, será necessário acessar o cartão por outro sistema/dispositivo. Um menu realmente pré-boot exige modificar e validar o mecanismo de boot específico da imagem ROCKNIX usada no R36H; isso ainda não foi implementado.
+**Não confirme apenas porque o sistema parece ter iniciado.** A confirmação é uma decisão visual manual; a ferramenta não consegue ler os pixels do LCD nem comprovar que a imagem está visível.
+
+## Limite importante: Reset e tela preta
+
+O seletor é executado depois que o ROCKNIX inicia. Em imagens com o fluxo de boot usual dessa família, o bootloader carrega `overlays/mipi-panel.dtbo` e aplica o DTBO ao device tree antes de iniciar o kernel. Se o painel provocar falha antes de chegar ao espaço de usuário, o menu do IdentifyPanel não vai executar naquela inicialização.
+
+Por isso, **pressionar Reset sozinho não faz rollback automático nesta versão**. O rollback manual só funciona quando o sistema consegue iniciar ou quando a partição pode ser editada por outro computador/sistema. Não está incluído um patch genérico de bootloader: isso depende dos arquivos reais de boot e das capacidades do U-Boot da imagem instalada. Alterar `boot.ini`, `boot.scr` ou o DTB sem confirmar esse layout pode impedir o boot.
 
 ## Salvaguardas e compatibilidade
 
-- Valida a estrutura FDT antes de instalar.
-- Faz cópia de segurança do overlay ativo e registra SHA-256/histórico.
-- Instala atomicamente uma cópia como `mipi-panel.dtbo`; os DTBOs do catálogo permanecem intactos.
+- Mantém um backup do overlay original, sem sobrescrevê-lo a cada teste.
+- Guarda o overlay anterior de cada tentativa para permitir rollback.
+- Instala cópias verificadas atomicamente e registra SHA-256, estado pendente, confirmação manual ou rejeição.
+- Recusa manifesto inválido e alguns caminhos de link simbólico que podem desviar as gravações.
 - Não altera o DTB principal.
-- A validação estrutural não prova compatibilidade com o DTB base, pinagem, temporização ou imagem visível.
-- Perfis publicados para R35S/R36S não são automaticamente compatíveis com R36H. Nenhum perfil deve ser marcado como compatível com R36H sem teste físico.
+- Não reinicia nem confirma automaticamente um perfil.
+- Os perfis publicados `r36s-panel*` e os demais candidatos não estão certificados para R36H. O nome “Panel 4” no DarkOS não prova que `r36s-panel4` seja o mesmo painel no ROCKNIX.
 
-Referências: https://rocknix.org/devices/unbranded/game-console-r35s-r36s/ e https://github.com/stolen/rnix/releases/tag/panel_overlays
+## Desenvolvimento e testes
+
+```sh
+python -m py_compile identifypanel.py tools/fetch_official_profiles.py tools/select_profile.py
+sh -n Selecionar-Tela.sh
+python -m unittest discover -s tests -v
+```
+
+Referências: [documentação ROCKNIX para R35S/R36S](https://rocknix.org/devices/unbranded/game-console-r35s-r36s/) e [release de perfis de painel](https://github.com/stolen/r.nix-distribution/releases/tag/panel_overlays).
