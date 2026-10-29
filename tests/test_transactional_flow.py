@@ -1,10 +1,12 @@
+import io
 import json
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from types import SimpleNamespace
 
-from identifypanel import confirm, rollback, restore, stage, status, validate_fdt_bytes
+from identifypanel import boot_info, confirm, rollback, restore, stage, validate_fdt_bytes
 from test_fdt_validation import make_fdt
 
 
@@ -113,6 +115,51 @@ class TransactionalPanelTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             stage(self.args())
         self.assertEqual(path.read_text(), "{ not json")
+
+
+    def test_restore_recovers_original_even_if_active_overlay_was_removed(self):
+        original = self.active.read_bytes()
+        stage(self.args())
+        confirm(SimpleNamespace(boot=str(self.root)))
+        self.active.unlink()
+        restore(SimpleNamespace(boot=str(self.root)))
+        self.assertEqual(self.active.read_bytes(), original)
+
+    def test_restore_removes_profile_if_original_overlay_did_not_exist(self):
+        self.active.unlink()
+        stage(self.args())
+        confirm(SimpleNamespace(boot=str(self.root)))
+        restore(SimpleNamespace(boot=str(self.root)))
+        self.assertFalse(self.active.exists())
+        state = self.read_state()
+        self.assertTrue(state["original_missing"])
+        self.assertEqual(state["active_profile"], "no-original-overlay")
+
+    def test_rollback_rejects_symlinked_backup(self):
+        stage(self.args())
+        state = self.read_state()
+        relative = state["pending"]["previous_overlay_backup"]
+        backup = self.root / relative
+        link = backup.with_name("unsafe-link.dtbo")
+        link.symlink_to(backup.name)
+        state["pending"]["previous_overlay_backup"] = str(link.relative_to(self.root))
+        (self.root / ".identifypanel" / "manifest.json").write_text(json.dumps(state))
+        with self.assertRaises(SystemExit):
+            rollback(SimpleNamespace(boot=str(self.root)))
+        self.assertIn("pending", self.read_state())
+
+    def test_boot_info_reports_boot_script_without_modifying_it(self):
+        script = self.root / "boot.ini"
+        original = "load mmc 1:1 ${dtbo_loadaddr} overlays/mipi-panel.dtbo\nfdt apply ${dtbo_loadaddr}\n"
+        script.write_text(original, encoding="utf-8")
+        output = io.StringIO()
+        with redirect_stdout(output):
+            boot_info(SimpleNamespace(boot=str(self.root)))
+        report = output.getvalue()
+        self.assertIn("boot.ini", report)
+        self.assertIn("mipi-panel.dtbo", report)
+        self.assertIn("Comando/aplicação FDT detectado: sim", report)
+        self.assertEqual(script.read_text(encoding="utf-8"), original)
 
 
 if __name__ == "__main__":
