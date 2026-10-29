@@ -188,8 +188,13 @@ def inspect(args):
     if active.is_symlink():
         raise SystemExit("Overlay ativo é link simbólico; operação bloqueada.")
     if active.exists():
+        if not active.is_file():
+            raise SystemExit("O caminho do overlay ativo não é um arquivo regular.")
         ok, message = check(active)
-        print("Ativo:", ok, message, "SHA256:", digest(active))
+        if ok:
+            print("Ativo:", True, message, "SHA256:", digest(active))
+        else:
+            print("Ativo:", False, message)
     else:
         print("Overlay mipi-panel.dtbo ausente.")
     alternatives = sorted(directory.glob("mipi-panel.dtbo.*"))
@@ -349,6 +354,8 @@ def rollback(args):
     target = directory / "mipi-panel.dtbo"
     if target.is_symlink():
         raise SystemExit("Overlay ativo é link simbólico; operação bloqueada.")
+    if target.exists() and not target.is_file():
+        raise SystemExit("O caminho do overlay ativo não é um arquivo; operação bloqueada.")
     manifest_path, data = manifest(root)
     pending = data.get("pending")
     if not isinstance(pending, dict):
@@ -384,6 +391,8 @@ def restore(args):
     target = directory / "mipi-panel.dtbo"
     if target.is_symlink():
         raise SystemExit("Overlay ativo é link simbólico; operação bloqueada.")
+    if target.exists() and not target.is_file():
+        raise SystemExit("O caminho do overlay ativo não é um arquivo; operação bloqueada.")
     manifest_path, data = manifest(root)
     pending = data.get("pending")
     if isinstance(pending, dict):
@@ -420,6 +429,10 @@ def status(args):
     target = directory / "mipi-panel.dtbo"
     manifest_path, data = manifest(root)
     print("Partição:", root)
+    if target.is_symlink():
+        raise SystemExit("Overlay ativo é link simbólico; operação bloqueada.")
+    if target.exists() and not target.is_file():
+        raise SystemExit("O caminho do overlay ativo não é um arquivo regular.")
     print("Overlay ativo:", "ausente" if not target.exists() else digest(target))
     print("Perfil registrado:", data.get("active_profile", "não confirmado"))
     pending = data.get("pending")
