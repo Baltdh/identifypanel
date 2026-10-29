@@ -68,26 +68,6 @@ def check(path):
         return False, str(exc)
 
 
-def overlay_dir(root):
-    for path in (root / "overlays", root / "ROCKNIX" / "overlays"):
-        if path.is_dir():
-            return path
-    raise SystemExit("Pasta overlays não encontrada na partição informada.")
-
-
-def manifest(root):
-    path = root / STATE / "manifest.json"
-    if path.exists():
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-            if not isinstance(data, dict) or data.get("format") != 1:
-                raise ValueError("formato inesperado")
-            return path, data
-        except (OSError, ValueError, json.JSONDecodeError):
-            raise SystemExit("Manifesto IdentifyPanel inválido.")
-    return path, {"format": 1, "history": [], "original_backup": None}
-
-
 def save(path, data):
     """Write JSON state atomically; never expose a partially written manifest."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -142,10 +122,13 @@ def _safe_state_file(root, relative):
     if not isinstance(relative, str) or not relative:
         raise SystemExit("Caminho de backup ausente ou inválido.")
     state = state_dir(root).resolve()
-    candidate = (root / relative).resolve()
-    if state not in candidate.parents or candidate == state:
+    raw = root / relative
+    if raw.is_symlink():
+        raise SystemExit("Backup é link simbólico; operação bloqueada.")
+    candidate = raw.resolve()
+    if candidate.parent != state:
         raise SystemExit("Caminho de backup fora do diretório de estado; operação bloqueada.")
-    if candidate.is_symlink() or not candidate.is_file():
+    if not candidate.is_file():
         raise SystemExit("Arquivo de backup ausente ou inseguro.")
     return candidate
 
@@ -289,7 +272,7 @@ def stage(args):
         data["pending"]["status"] = "pending"
         data["history"][history_index]["result"] = "pending"
         save(manifest_path, data)
-    except Exception:
+    except BaseException as stage_error:
         # Best-effort synchronous rollback if staging itself fails.
         pending = data.get("pending", {})
         try:
@@ -303,12 +286,12 @@ def stage(args):
             data["history"][history_index]["result"] = "stage-error-rolled-back"
             data.pop("pending", None)
             save(manifest_path, data)
-        except Exception as rollback_error:
+        except BaseException as rollback_error:
             raise SystemExit(
                 f"Falha ao aplicar perfil e falha no rollback: {rollback_error}. "
                 f"Estado preservado em {manifest_path}"
             )
-        raise
+        raise stage_error
     print("TESTE PENDENTE:", profile)
     print("Overlay preparado para o próximo boot:", target)
     print("Reinicie o console. Só use 'confirm' depois de ver a imagem funcionando.")
