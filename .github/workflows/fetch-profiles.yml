@@ -4,43 +4,62 @@ on:
   schedule:
     - cron: "17 8 1 * *"
 permissions:
-  contents: read
+  contents: write
 jobs:
   build-offline-package:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Download and validate official DTBO profiles
+      - name: Download and validate every published official DTBO
         run: python tools/fetch_official_profiles.py --output profiles/official
-      - name: Run validation and compile checks
+      - name: Verify manifest, hashes, and FDT files
         run: |
           python -m py_compile identifypanel.py tools/fetch_official_profiles.py tools/select_profile.py
           python -m unittest discover -s tests -v
           python identifypanel.py profiles --profiles profiles/official
-      - name: Require at least one validated DTBO
-        run: |
           python - <<'PY'
-          import json
+          import hashlib, json
           from pathlib import Path
-
           root = Path("profiles/official")
-          manifest_path = root / "manifest.json"
-          if not manifest_path.is_file():
-              raise SystemExit("ERRO: manifesto de perfis não foi gerado.")
-          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+          manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
           profiles = manifest.get("profiles")
           if not isinstance(profiles, list) or not profiles:
-              raise SystemExit("ERRO: nenhum perfil DTBO validado; pacote offline cancelado.")
-          listed = {item.get("file") for item in profiles if isinstance(item, dict)}
-          actual = {p.name for p in root.iterdir() if p.is_file() and
-                    (p.suffix == ".dtbo" or ".dtbo." in p.name)}
-          if not listed or not listed.issubset(actual):
-              raise SystemExit("ERRO: manifesto e arquivos DTBO não correspondem.")
-          print(f"OK: {len(listed)} perfis DTBO validados e presentes.")
+              raise SystemExit("ERRO: nenhum perfil DTBO validado.")
+          seen = set()
+          for item in profiles:
+              name = item.get("file")
+              expected = item.get("sha256")
+              if not isinstance(name, str) or Path(name).name != name or name in seen:
+                  raise SystemExit(f"ERRO: nome duplicado ou inseguro: {name!r}")
+              seen.add(name)
+              path = root / name
+              if not path.is_file():
+                  raise SystemExit(f"ERRO: arquivo ausente: {name}")
+              actual = hashlib.sha256(path.read_bytes()).hexdigest()
+              if actual != expected:
+                  raise SystemExit(f"ERRO: SHA256 divergente: {name}")
+          actual_files = {p.name for p in root.iterdir() if p.is_file() and
+                          (p.suffix == ".dtbo" or ".dtbo." in p.name)}
+          if actual_files != seen:
+              raise SystemExit("ERRO: há DTBOs não listados ou ausentes no manifesto.")
+          print(f"OK: {len(seen)} DTBOs validados e hashes conferidos.")
           PY
+      - name: Store downloaded profiles in this GitHub branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add profiles/official
+          if ! git diff --cached --quiet; then
+            git commit -m "Update official ROCKNIX panel profiles"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          else
+            echo "Perfis já estão atualizados."
+          fi
       - name: Assemble complete offline folder
         run: |
           mkdir -p IdentifyPanel-Offline/tools IdentifyPanel-Offline/profiles
@@ -57,27 +76,28 @@ jobs:
             read -r _
             exit 1
           fi
-          exec python3 "$HERE/tools/select_profile.py" --boot "${1:-/flash}"
+          exec python3 "$HERE/tools/select_profile.py" --boot "${1:-/flash}" --next
           EOF
           chmod +x IdentifyPanel-Offline/Selecionar-Perfil.sh
           cat > IdentifyPanel-Offline/LEIA-ME-OFFLINE.txt <<'EOF'
-          IDENTIFYPANEL — PACOTE OFFLINE
+          IDENTIFYPANEL — PERFIS OFFLINE E TESTE SEQUENCIAL
           
-          Esta pasta já contém os perfis DTBO incluídos na montagem deste pacote.
-          Não é necessário baixar os perfis no R36H.
+          Os DTBOs oficiais estruturalmente válidos ficam em profiles/official.
+          O seletor pesquisa essa pasta; não precisa de internet no console.
           
-          No ROCKNIX, aponte o seletor para a partição que contém a pasta overlays:
-            ./Selecionar-Perfil.sh /flash
+          Execute após cada inicialização que permita usar o programa:
+            ./Selecionar-Perfil.sh /CAMINHO/DA/PARTICAO-ROCKNIX
           
-          O caminho /flash é apenas o padrão inicial; confirme o ponto de montagem
-          da sua versão ROCKNIX antes de aplicar.
+          Cada execução aplica somente o próximo perfil como overlays/mipi-panel.dtbo.
+          Reinicie e confira a imagem antes de executar novamente. Se a tela ficar preta,
+          o aplicativo pós-boot não consegue avançar; desligue e recupere o cartão em outro
+          dispositivo. Não altere o DTB principal e preserve um backup do cartão.
           
-          Requisitos: Python 3 disponível no sistema. Se não existir, use o pacote
-          em um computador para preparar a partição. Não altere o DTB principal.
-          Faça um teste por vez e preserve o cartão original.
+          O programa salva o overlay anterior e o histórico em .identifypanel.
+          Para reiniciar a sequência: python3 tools/select_profile.py --boot /CAMINHO --reset-sequence
           
-          Perfis publicados para R35S/R36S não são automaticamente compatíveis com R36H.
-          A validação estrutural não confirma imagem; cada perfil exige teste visual.
+          Os perfis publicados para R35S/R36S não são automaticamente compatíveis com
+          R36H. Validação FDT confirma estrutura, não compatibilidade elétrica/visual.
           EOF
           cp profiles/official/manifest.json IdentifyPanel-Offline/
           cd IdentifyPanel-Offline
