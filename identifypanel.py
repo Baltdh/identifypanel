@@ -141,8 +141,10 @@ def apply(args):
     if target.exists():
         backup = state / ("mipi-panel.before-" + stamp + ".dtbo")
         shutil.copy2(target, backup)
-        if not data.get("original_backup"):
+        if not data.get("original_backup") and not data.get("original_missing"):
             data["original_backup"] = str(backup.relative_to(root))
+    elif "original_missing" not in data and not data.get("original_backup"):
+        data["original_missing"] = True
     temporary = target.with_name("mipi-panel.dtbo.new")
     shutil.copy2(source, temporary)
     valid, detail = check(temporary)
@@ -166,6 +168,17 @@ def restore(args):
     root = Path(args.boot).resolve()
     manifest_path, data = manifest(root)
     relative = data.get("original_backup")
+    target = overlay_dir(root) / "mipi-panel.dtbo"
+    if data.get("original_missing"):
+        if target.exists():
+            shutil.copy2(target, root / STATE /
+                         ("before-restore-" + time.strftime("%Y%m%d-%H%M%S") + ".dtbo"))
+            target.unlink()
+        data.setdefault("history", []).append({"action": "restore-original-absence"})
+        data["active_profile"] = "no-original-overlay"
+        save(manifest_path, data)
+        print("Estado original restaurado: overlay removido (não existia antes do primeiro teste).")
+        return
     if not relative:
         raise SystemExit("Não há overlay original salvo pelo IdentifyPanel.")
     backup = (root / relative).resolve()
@@ -174,7 +187,6 @@ def restore(args):
     ok, message = check(backup)
     if not ok:
         raise SystemExit("Backup inválido: " + message)
-    target = overlay_dir(root) / "mipi-panel.dtbo"
     temporary = target.with_name("mipi-panel.dtbo.restore")
     shutil.copy2(backup, temporary)
     if target.exists():
