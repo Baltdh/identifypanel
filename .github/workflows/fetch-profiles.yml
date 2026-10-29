@@ -17,9 +17,10 @@ jobs:
           python-version: "3.11"
       - name: Download and validate every published official DTBO
         run: python tools/fetch_official_profiles.py --output profiles/official
-      - name: Verify manifest, hashes, and FDT files
+      - name: Verify manifest, hashes, FDT files, and shell syntax
         run: |
           python -m py_compile identifypanel.py tools/fetch_official_profiles.py tools/select_profile.py
+          sh -n Selecionar-Tela.sh
           python -m unittest discover -s tests -v
           python identifypanel.py profiles --profiles profiles/official
           python - <<'PY'
@@ -65,39 +66,34 @@ jobs:
           mkdir -p IdentifyPanel-Offline/tools IdentifyPanel-Offline/profiles
           cp identifypanel.py IdentifyPanel-Offline/
           cp README.md IdentifyPanel-Offline/
+          cp Selecionar-Tela.sh IdentifyPanel-Offline/
           cp tools/select_profile.py IdentifyPanel-Offline/tools/
           cp -r profiles/official IdentifyPanel-Offline/profiles/
-          cat > IdentifyPanel-Offline/Selecionar-Perfil.sh <<'EOF'
-          #!/bin/sh
-          HERE="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-          if ! command -v python3 >/dev/null 2>&1; then
-            echo "Python 3 não está disponível neste sistema."
-            echo "Use o pacote em um computador com Python 3 ou instale Python 3 no ROCKNIX."
-            read -r _
-            exit 1
-          fi
-          exec python3 "$HERE/tools/select_profile.py" --boot "${1:-/flash}" --next
-          EOF
-          chmod +x IdentifyPanel-Offline/Selecionar-Perfil.sh
+          chmod +x IdentifyPanel-Offline/Selecionar-Tela.sh
           cat > IdentifyPanel-Offline/LEIA-ME-OFFLINE.txt <<'EOF'
-          IDENTIFYPANEL — PERFIS OFFLINE E TESTE SEQUENCIAL
+          IDENTIFYPANEL — MENU SHELL DE SELEÇÃO DE TELA
           
-          Os DTBOs oficiais estruturalmente válidos ficam em profiles/official.
-          O seletor pesquisa essa pasta; não precisa de internet no console.
+          1. Extraia a pasta completa no cartão/armazenamento.
+          2. Abra um terminal no ROCKNIX e execute:
+             cd /CAMINHO/IdentifyPanel-Offline
+             ./Selecionar-Tela.sh /CAMINHO/DA/PARTICAO-ROCKNIX
+          3. Escolha um perfil no menu e confirme com APLICAR.
+          4. Reinicie o console e verifique a imagem.
+          5. Se funcionar, não altere mais. Se não funcionar, recupere o acesso ao
+             armazenamento, execute o menu novamente e escolha outro perfil.
           
-          Execute após cada inicialização que permita usar o programa:
-            ./Selecionar-Perfil.sh /CAMINHO/DA/PARTICAO-ROCKNIX
+          O menu também oferece R para restaurar o overlay original e 0 para sair.
+          O arquivo de origem em profiles/official nunca é renomeado: uma cópia é
+          instalada como overlays/mipi-panel.dtbo. A validação FDT e o backup são
+          feitos pelo identifypanel.py.
           
-          Cada execução aplica somente o próximo perfil como overlays/mipi-panel.dtbo.
-          Reinicie e confira a imagem antes de executar novamente. Se a tela ficar preta,
-          o aplicativo pós-boot não consegue avançar; desligue e recupere o cartão em outro
-          dispositivo. Não altere o DTB principal e preserve um backup do cartão.
+          IMPORTANTE: este menu roda depois que o ROCKNIX iniciou. Se um perfil causar
+          tela preta, o menu não poderá aparecer nessa inicialização. Nesse caso será
+          necessário usar outro computador/sistema ou um mecanismo de recuperação
+          externo para voltar ao cartão. Não é um seletor pré-boot.
           
-          O programa salva o overlay anterior e o histórico em .identifypanel.
-          Para reiniciar a sequência: python3 tools/select_profile.py --boot /CAMINHO --reset-sequence
-          
-          Os perfis publicados para R35S/R36S não são automaticamente compatíveis com
-          R36H. Validação FDT confirma estrutura, não compatibilidade elétrica/visual.
+          Os DTBOs são candidatos estruturais publicados para outros modelos; não há
+          garantia de compatibilidade física com R36H. Preserve o cartão original.
           EOF
           cp profiles/official/manifest.json IdentifyPanel-Offline/
           cd IdentifyPanel-Offline
