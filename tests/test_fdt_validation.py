@@ -37,6 +37,16 @@ class FdtValidationTests(unittest.TestCase):
         ok, _ = validate_fdt_bytes(make_fdt(version=15))
         self.assertFalse(ok)
 
+    def test_rejects_unterminated_reservation_map(self):
+        data = bytearray(make_fdt())
+        data[48:64] = b"\\x01" * 16
+        ok, _ = validate_fdt_bytes(bytes(data))
+        self.assertFalse(ok)
+
+    def test_rejects_misaligned_structure_offset(self):
+        ok, _ = validate_fdt_bytes(make_fdt(off_struct=41))
+        self.assertFalse(ok)
+
 
 if __name__ == "__main__":
     unittest.main()
