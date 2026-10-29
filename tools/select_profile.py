@@ -3,7 +3,9 @@
 import argparse
 from pathlib import Path
 from types import SimpleNamespace
+import sys
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from identifypanel import apply, check
 
 
@@ -18,7 +20,7 @@ def main():
     if not profiles_dir.is_dir():
         raise SystemExit(f"Pasta de perfis não encontrada: {profiles_dir}")
 
-    files = sorted(p for p in profiles_dir.rglob("*.dtbo") if p.is_file())
+    files = sorted(p for p in profiles_dir.rglob("*") if p.is_file() and\n                   (p.suffix == ".dtbo" or ".dtbo." in p.name))
     valid = []
     print("\nIDENTIFYPANEL — PERFIS LOCAIS")
     print("Nenhum download será feito neste menu.\n")
