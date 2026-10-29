@@ -14,8 +14,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Compile
-        run: python -m py_compile identifypanel.py tools/fetch_official_profiles.py tools/select_profile.py
+      - name: Compile Python and validate Shell syntax
+        run: |
+          python -m py_compile identifypanel.py tools/fetch_official_profiles.py tools/select_profile.py
+          sh -n Selecionar-Tela.sh
       - name: Unit tests
         run: python -m unittest discover -s tests -v
       - name: CLI smoke test
