@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from identifypanel import apply, check
+from identifypanel import stage, check
 
 def discover(root):
     found = sorted(p for p in root.rglob("*")
@@ -27,7 +27,7 @@ def main():
     parser.add_argument("--boot", required=True, help="Partição ROCKNIX contendo overlays/")
     parser.add_argument("--profiles", default=None, help="Catálogo local; padrão profiles/official")
     mode = parser.add_mutually_exclusive_group()
-    mode.add_argument("--next", action="store_true", help="Instala o próximo perfil ainda não testado")
+    mode.add_argument("--next", action="store_true", help="Prepara o próximo perfil como teste pendente")
     mode.add_argument("--reset-sequence", action="store_true", help="Reinicia o índice da sequência")
     args = parser.parse_args()
 
@@ -64,12 +64,14 @@ def main():
             raise SystemExit("Todos os perfis foram aplicados. Use --reset-sequence para recomeçar.")
         selected = valid[index]
         print(f"\nPróximo perfil: {index + 1}/{len(valid)} — {selected.name}")
-        print("Será instalado como overlays/mipi-panel.dtbo. É necessário reiniciar o console.")
-        print("Depois do reinício, confira se a imagem apareceu antes de executar --next novamente.")
-        confirm = input("Digite TESTAR para aplicar: ").strip()
+        print("Será instalado como teste PENDENTE em overlays/mipi-panel.dtbo.")
+        print("Reinicie e verifique a imagem. Se funcionar, rode o comando confirm;")
+        print("se falhar e o sistema iniciar, rode rollback antes de tentar outro perfil.")
+        print("A ferramenta não faz detecção automática da imagem nem rollback pré-boot.")
+        confirm = input("Digite TESTAR para preparar o próximo boot: ").strip()
         if confirm != "TESTAR":
             raise SystemExit("Cancelado; nenhum arquivo foi alterado.")
-        apply(SimpleNamespace(boot=str(boot), dtbo=str(selected), name=selected.name))
+        stage(SimpleNamespace(boot=str(boot), dtbo=str(selected), name=selected.name))
         state["last_applied"] = index
         state["profiles"] = [p.name for p in valid]
         temporary = sequence_file.with_suffix(".tmp")
@@ -91,7 +93,7 @@ def main():
     if not 1 <= choice <= len(valid):
         raise SystemExit("Número fora da lista.")
     selected = valid[choice - 1]
-    if input(f"Digite APLICAR para instalar {selected.name}: ").strip() != "APLICAR":
+    if input(f"Digite TESTAR para preparar {selected.name}: ").strip() != "TESTAR":
         raise SystemExit("Cancelado.")
     apply(SimpleNamespace(boot=str(boot), dtbo=str(selected), name=selected.name))
 
