@@ -77,20 +77,22 @@ jobs:
           2. Abra um terminal no ROCKNIX e execute:
              cd /CAMINHO/IdentifyPanel-Offline
              ./Selecionar-Tela.sh /CAMINHO/DA/PARTICAO-ROCKNIX
-          3. Escolha um perfil no menu e confirme com APLICAR.
-          4. Reinicie o console e verifique a imagem.
-          5. Se funcionar, não altere mais. Se não funcionar, recupere o acesso ao
-             armazenamento, execute o menu novamente e escolha outro perfil.
+          3. Escolha um perfil e digite TESTAR para deixá-lo pendente para o próximo boot.
+          4. Reinicie o console e verifique a imagem fisicamente.
+          5. Se a imagem funcionar, abra o menu e use C para confirmar.
+          6. Se o sistema iniciar com imagem errada, use F para rollback, reinicie
+             e só então escolha o próximo perfil.
+          7. Use R para restaurar o overlay original anterior à primeira tentativa.
           
-          O menu também oferece R para restaurar o overlay original e 0 para sair.
-          O arquivo de origem em profiles/official nunca é renomeado: uma cópia é
-          instalada como overlays/mipi-panel.dtbo. A validação FDT e o backup são
-          feitos pelo identifypanel.py.
+          O arquivo de origem em profiles/official nunca é renomeado. Uma cópia validada
+          é instalada como overlays/mipi-panel.dtbo. O estado de cada teste e os hashes
+          ficam em .identifypanel/manifest.json. O perfil só é marcado como confirmado
+          após a ação manual C; o programa não detecta pixels do LCD.
           
-          IMPORTANTE: este menu roda depois que o ROCKNIX iniciou. Se um perfil causar
-          tela preta, o menu não poderá aparecer nessa inicialização. Nesse caso será
-          necessário usar outro computador/sistema ou um mecanismo de recuperação
-          externo para voltar ao cartão. Não é um seletor pré-boot.
+          IMPORTANTE: o menu roda depois que o ROCKNIX iniciou. Se o kernel travar ou a
+          tela impedir o acesso ao menu, Reset sozinho NÃO executará rollback. Será
+          necessário recuperar a partição usando outro computador/sistema ou leitor
+          de cartão. Um seletor pré-boot requer adaptar e validar o bootloader real.
           
           Os DTBOs são candidatos estruturais publicados para outros modelos; não há
           garantia de compatibilidade física com R36H. Preserve o cartão original.
