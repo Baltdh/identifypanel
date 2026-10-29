@@ -228,6 +228,8 @@ def stage(args):
     target = directory / "mipi-panel.dtbo"
     if target.is_symlink():
         raise SystemExit("Overlay ativo é link simbólico; operação bloqueada.")
+    if target.exists() and not target.is_file():
+        raise SystemExit("O caminho do overlay ativo não é um arquivo; operação bloqueada.")
     state = state_dir(root)
     manifest_path, data = manifest(root)
     if data.get("pending"):
@@ -319,6 +321,8 @@ def confirm(args):
     target = directory / "mipi-panel.dtbo"
     if target.is_symlink():
         raise SystemExit("Overlay ativo é link simbólico; operação bloqueada.")
+    if target.exists() and not target.is_file():
+        raise SystemExit("O caminho do overlay ativo não é um arquivo; operação bloqueada.")
     manifest_path, data = manifest(root)
     pending = data.get("pending")
     if not isinstance(pending, dict) or pending.get("status") != "pending":
@@ -400,7 +404,8 @@ def restore(args):
     ok, message = check(backup)
     if not ok:
         raise SystemExit("Backup original inválido: " + message)
-    _copy_backup(target, state_dir(root), "before-restore")
+    if target.exists():
+        _copy_backup(target, state_dir(root), "before-restore")
     _copy_atomic(backup, target)
     data["active_profile"] = "original-backup"
     data["last_restore"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
