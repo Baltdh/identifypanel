@@ -447,6 +447,73 @@ def status(args):
     elif data.get("original_missing"):
         print("Overlay original: não existia no primeiro teste")
 
+def boot_info(args):
+    """Read-only inventory of boot files to guide a safe pre-kernel recovery design."""
+    root = Path(args.boot).resolve()
+    if not root.is_dir():
+        raise SystemExit("Partição de boot não encontrada: " + str(root))
+    print("Partição de boot:", root)
+    try:
+        entries = sorted(root.iterdir(), key=lambda item: item.name.lower())
+    except OSError as exc:
+        raise SystemExit("Não foi possível listar a partição: " + str(exc))
+    print("Itens na raiz:")
+    for path in entries[:80]:
+        suffix = "/" if path.is_dir() else ""
+        print(" ", path.name + suffix)
+    if len(entries) > 80:
+        print(f"  ... mais {len(entries) - 80} itens")
+
+    candidates = (
+        root / "boot.ini",
+        root / "boot.cmd",
+        root / "boot.scr",
+        root / "boot.scr.uimg",
+        root / "uEnv.txt",
+        root / "extlinux.conf",
+        root / "extlinux" / "extlinux.conf",
+        root / "ROCKNIX" / "boot.ini",
+        root / "ROCKNIX" / "boot.cmd",
+        root / "ROCKNIX" / "extlinux" / "extlinux.conf",
+    )
+    found = 0
+    for path in candidates:
+        if not path.exists():
+            continue
+        found += 1
+        relative = path.relative_to(root)
+        if path.is_symlink():
+            print(f"\n[{relative}] link simbólico; conteúdo não lido.")
+            continue
+        try:
+            data = path.read_bytes()
+        except OSError as exc:
+            print(f"\n[{relative}] erro de leitura: {exc}")
+            continue
+        print(f"\n[{relative}] tamanho={len(data)} SHA256={hashlib.sha256(data).hexdigest()}")
+        if path.suffix in (".scr", ".uimg") or b"\x00" in data[:256]:
+            print("Arquivo binário; não será tratado como script de texto.")
+            continue
+        try:
+            text = data.decode("utf-8")
+        except UnicodeDecodeError:
+            print("Codificação não textual; conteúdo omitido.")
+            continue
+        lines = text.splitlines()
+        for number, line in enumerate(lines[:180], 1):
+            print(f"{number:03d}: {line}")
+        if len(lines) > 180:
+            print(f"... conteúdo truncado; total de {len(lines)} linhas")
+        lower = text.lower()
+        print("Referência a mipi-panel.dtbo:", "sim" if "mipi-panel.dtbo" in lower else "não")
+        print("Comando/aplicação FDT detectado:", "sim" if any(x in lower for x in ("fdt apply", "fdtoverlays", "fdt addr")) else "não")
+    if not found:
+        print("Nenhum boot.ini/boot.cmd/boot.scr/uEnv.txt/extlinux.conf encontrado nos caminhos comuns.")
+        print("Isso não prova ausência de bootloader; pode ser um layout diferente ou script binário.")
+    print("\nDiagnóstico somente de leitura. Nenhum arquivo foi modificado.")
+    print("A presença de um arquivo não confirma quais comandos U-Boot estão habilitados.")
+
+
 def device_info(args):
     print("Sistema:", platform.platform())
     for label, path in (("model", Path("/proc/device-tree/model")),
@@ -502,6 +569,10 @@ def main():
     command = commands.add_parser("status", help="mostra o estado de teste")
     command.add_argument("--boot", required=True)
     command.set_defaults(run=status)
+
+    command = commands.add_parser("boot-info", help="inspeciona arquivos do boot sem modificá-los")
+    command.add_argument("--boot", required=True)
+    command.set_defaults(run=boot_info)
 
     command = commands.add_parser("device-info")
     command.set_defaults(run=device_info)
