@@ -6,7 +6,6 @@ No profile count or panel number is assumed. Original asset names are preserved.
 import argparse
 import hashlib
 import json
-import struct
 import os
 import sys
 import urllib.error
@@ -14,7 +13,6 @@ import urllib.request
 from pathlib import Path
 
 API = "https://api.github.com/repos/stolen/rnix/releases/tags/panel_overlays"
-MAGIC = b"\xd0\x0d\xfe\xed"
 
 def request(url):
     req = urllib.request.Request(url, headers={
@@ -26,36 +24,9 @@ def request(url):
         return response.read()
 
 def validate(data):
-    if len(data) < 40 or data[:4] != MAGIC:
-        return False, "FDT magic/header ausente"
-    (total, off_struct, off_strings, off_rsvmap, version,
-     last_comp, _boot_cpu, size_strings, size_struct) = struct.unpack(">9I", data[4:40])
-    if total < 40 or total > len(data):
-        return False, "tamanho FDT inconsistente"
-    if version < 16 or last_comp < 16 or last_comp > version:
-        return False, "versão FDT incompatível"
-    if min(off_struct, off_strings, off_rsvmap) < 40:
-        return False, "offset FDT dentro do cabeçalho"
-    if off_struct % 4 or off_strings % 4 or off_rsvmap % 8:
-        return False, "alinhamento dos offsets FDT inválido"
-    if off_struct + size_struct > total or off_strings + size_strings > total or size_struct < 4:
-        return False, "seções FDT fora dos limites"
-    if max(off_struct, off_strings) < min(off_struct + size_struct, off_strings + size_strings):
-        return False, "seções FDT sobrepostas"
-    cursor, terminated = off_rsvmap, False
-    while cursor + 16 <= total:
-        address, size = struct.unpack_from(">QQ", data, cursor)
-        cursor += 16
-        if address == 0 and size == 0:
-            terminated = True
-            break
-    if not terminated:
-        return False, "mapa de reservas sem terminador"
-    if not (cursor <= off_struct or off_rsvmap >= off_struct + size_struct):
-        return False, "mapa de reservas sobrepõe estrutura"
-    if not (cursor <= off_strings or off_rsvmap >= off_strings + size_strings):
-        return False, "mapa de reservas sobrepõe strings"
-    return True, f"FDT estruturalmente consistente ({total} bytes)"
+    # Keep download-time validation identical to the installer/CLI validator.
+    from identifypanel import validate_fdt_bytes
+    return validate_fdt_bytes(data)
 
 def main():
     ap = argparse.ArgumentParser()
