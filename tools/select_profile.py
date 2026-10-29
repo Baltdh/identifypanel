@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Menu local para escolher um DTBO já incluído no pacote IdentifyPanel."""
+"""Local DTBO selector with a persistent, one-profile-at-a-time test sequence."""
 import argparse
+import json
 from pathlib import Path
 from types import SimpleNamespace
 import sys
@@ -8,57 +9,91 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from identifypanel import apply, check
 
+def discover(root):
+    found = sorted(p for p in root.rglob("*")
+                   if p.is_file() and (p.suffix == ".dtbo" or ".dtbo." in p.name))
+    valid = []
+    for path in found:
+        ok, detail = check(path)
+        if ok:
+            valid.append(path)
+            print(f"OK {path.name} [{path.stat().st_size} bytes]")
+        else:
+            print(f"IGNORADO {path.name}: {detail}")
+    return valid
 
 def main():
-    parser = argparse.ArgumentParser(description="Selecionar um perfil DTBO local")
-    parser.add_argument("--boot", required=True, help="Ponto de montagem da partição ROCKNIX que contém overlays/")
-    parser.add_argument("--profiles", default=None, help="Pasta local dos perfis; padrão: profiles/official ao lado do pacote")
+    parser = argparse.ArgumentParser(description="IdentifyPanel — perfis DTBO locais")
+    parser.add_argument("--boot", required=True, help="Partição ROCKNIX contendo overlays/")
+    parser.add_argument("--profiles", default=None, help="Catálogo local; padrão profiles/official")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--next", action="store_true", help="Instala o próximo perfil ainda não testado")
+    mode.add_argument("--reset-sequence", action="store_true", help="Reinicia o índice da sequência")
     args = parser.parse_args()
 
     package = Path(__file__).resolve().parent.parent
     profiles_dir = Path(args.profiles).resolve() if args.profiles else package / "profiles" / "official"
     if not profiles_dir.is_dir():
-        raise SystemExit(f"Pasta de perfis não encontrada: {profiles_dir}")
-
-    files = sorted(
-        p for p in profiles_dir.rglob("*")
-        if p.is_file() and (p.suffix == ".dtbo" or ".dtbo." in p.name)
-    )
-    valid = []
-    print("\nIDENTIFYPANEL — PERFIS LOCAIS")
-    print("Nenhum download será feito neste menu.\n")
-    for path in files:
-        ok, detail = check(path)
-        if ok:
-            valid.append(path)
-            print(f"{len(valid):2d}. {path.name}  [{path.stat().st_size} bytes]")
-        else:
-            print(f" -- IGNORADO {path.name}: {detail}")
-
+        raise SystemExit(f"Catálogo não encontrado: {profiles_dir}")
+    valid = discover(profiles_dir)
     if not valid:
-        raise SystemExit("Nenhum DTBO passou na validação estrutural.")
+        raise SystemExit("Nenhum DTBO válido encontrado no catálogo local.")
 
-    print("\nDigite o número do perfil para instalar.")
-    print("0. Sair sem alterar nada")
+    boot = Path(args.boot).resolve()
+    state_dir = boot / ".identifypanel"
+    sequence_file = state_dir / "test-sequence.json"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    state = {"format": 1, "last_applied": -1, "profiles": [p.name for p in valid]}
+
+    if sequence_file.exists():
+        try:
+            old = json.loads(sequence_file.read_text(encoding="utf-8"))
+            if old.get("profiles") == state["profiles"]:
+                state.update(old)
+        except (OSError, ValueError, TypeError):
+            raise SystemExit("Estado da sequência inválido; não vou sobrescrevê-lo.")
+    if args.reset_sequence:
+        state["last_applied"] = -1
+        sequence_file.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+        print("Sequência reiniciada. Nenhum overlay foi alterado.")
+        return
+
+    if args.next:
+        index = int(state.get("last_applied", -1)) + 1
+        if index >= len(valid):
+            raise SystemExit("Todos os perfis foram aplicados. Use --reset-sequence para recomeçar.")
+        selected = valid[index]
+        print(f"\nPróximo perfil: {index + 1}/{len(valid)} — {selected.name}")
+        print("Será instalado como overlays/mipi-panel.dtbo. É necessário reiniciar o console.")
+        print("Depois do reinício, confira se a imagem apareceu antes de executar --next novamente.")
+        confirm = input("Digite TESTAR para aplicar: ").strip()
+        if confirm != "TESTAR":
+            raise SystemExit("Cancelado; nenhum arquivo foi alterado.")
+        apply(SimpleNamespace(boot=str(boot), dtbo=str(selected), name=selected.name))
+        state["last_applied"] = index
+        state["profiles"] = [p.name for p in valid]
+        temporary = sequence_file.with_suffix(".tmp")
+        temporary.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+        temporary.replace(sequence_file)
+        print(f"Sequência: perfil {index + 1} de {len(valid)} aplicado.")
+        return
+
+    print("\nIDENTIFYPANEL — PERFIS LOCAIS")
+    for i, path in enumerate(valid, 1):
+        print(f"{i:2d}. {path.name}")
+    print("\nDigite o número do perfil ou 0 para sair.")
     try:
         choice = int(input("> ").strip())
     except (ValueError, EOFError):
         raise SystemExit("Seleção inválida; nada foi alterado.")
     if choice == 0:
-        print("Cancelado; nada foi alterado.")
         return
-    if choice < 1 or choice > len(valid):
-        raise SystemExit("Número fora da lista; nada foi alterado.")
-
+    if not 1 <= choice <= len(valid):
+        raise SystemExit("Número fora da lista.")
     selected = valid[choice - 1]
-    print(f"\nSelecionado: {selected.name}")
-    print("A instalação substituirá overlays/mipi-panel.dtbo e salvará uma cópia do overlay existente.")
-    confirm = input("Digite APLICAR para continuar: ").strip()
-    if confirm != "APLICAR":
-        raise SystemExit("Cancelado; nada foi alterado.")
-
-    apply(SimpleNamespace(boot=args.boot, dtbo=str(selected), name=selected.name))
-
+    if input(f"Digite APLICAR para instalar {selected.name}: ").strip() != "APLICAR":
+        raise SystemExit("Cancelado.")
+    apply(SimpleNamespace(boot=str(boot), dtbo=str(selected), name=selected.name))
 
 if __name__ == "__main__":
     main()
