@@ -36,6 +36,36 @@ if [ ! -d "$BOOT" ]; then
     exit 1
 fi
 
+# ROCKNIX commonly mounts /flash read-only. Remount only around write operations.
+run_write() {
+    write_mount_opts=$(awk -v mp="$BOOT" '$2 == mp { print $4; exit }' /proc/mounts 2>/dev/null || true)
+    restore_read_only=0
+    case ",$write_mount_opts," in
+        *,ro,*)
+            if ! mount -o remount,rw "$BOOT"; then
+                echo "ERRO: não foi possível remontar $BOOT para escrita."
+                return 1
+            fi
+            restore_read_only=1
+            ;;
+    esac
+
+    if "$@"; then
+        write_status=0
+    else
+        write_status=$?
+    fi
+    sync
+
+    if [ "$restore_read_only" -eq 1 ]; then
+        if ! mount -o remount,ro "$BOOT"; then
+            echo "AVISO: a partição não voltou para somente leitura. Verifique a montagem."
+            return 1
+        fi
+    fi
+    return "$write_status"
+}
+
 LIST="${TMPDIR:-/tmp}/identifypanel-menu-$$"
 trap 'rm -f "$LIST"' 0
 trap 'exit 130' HUP INT TERM
@@ -76,21 +106,21 @@ while :; do
     case "$choice" in
         0) exit 0 ;;
         C|c)
-            if "$PYTHON" "$APP" confirm --boot "$BOOT"; then
+            if run_write "$PYTHON" "$APP" confirm --boot "$BOOT"; then
                 echo "Confirmação registrada. O perfil agora está marcado como confirmado."
             else
                 echo "Não foi possível confirmar. O estado pendente foi preservado."
             fi
             ;;
         F|f)
-            if "$PYTHON" "$APP" rollback --boot "$BOOT"; then
+            if run_write "$PYTHON" "$APP" rollback --boot "$BOOT"; then
                 echo "Rollback concluído. Reinicie para carregar o overlay anterior."
             else
                 echo "Rollback não concluído. Preserve o cartão e consulte o diagnóstico."
             fi
             ;;
         R|r)
-            if "$PYTHON" "$APP" restore --boot "$BOOT"; then
+            if run_write "$PYTHON" "$APP" restore --boot "$BOOT"; then
                 echo "Reinicie para carregar o overlay original restaurado."
             else
                 echo "Restauração não concluída. Preserve o cartão e consulte o diagnóstico."
@@ -116,7 +146,10 @@ while :; do
                 echo "Cancelado; nenhum arquivo foi alterado."
                 continue
             fi
-            "$PYTHON" "$APP" stage --boot "$BOOT" --dtbo "$selected" --name "${selected##*/}"
+            if ! run_write "$PYTHON" "$APP" stage --boot "$BOOT" --dtbo "$selected" --name "${selected##*/}"; then
+                echo "A preparação falhou. Nenhum teste foi confirmado."
+                continue
+            fi
             echo
             echo "Agora reinicie o R36H e verifique a imagem."
             echo "Se a imagem aparecer corretamente, volte aqui e use C para confirmar."
