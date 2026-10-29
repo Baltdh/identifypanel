@@ -1,0 +1,27 @@
+name: Fetch official panel profiles
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 8 1 * *"
+permissions:
+  contents: read
+jobs:
+  fetch-profiles:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Download and validate every official DTBO asset
+        run: python tools/fetch_official_profiles.py --output profiles/official
+      - name: Package verified profiles and manifest
+        run: |
+          cd profiles
+          zip -r ../IdentifyPanel-ROCKNIX-official-profiles.zip official
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IdentifyPanel-ROCKNIX-official-profiles
+          path: IdentifyPanel-ROCKNIX-official-profiles.zip
+          if-no-files-found: error
+          retention-days: 90
