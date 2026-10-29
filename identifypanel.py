@@ -34,10 +34,30 @@ def validate_fdt_bytes(data):
         return False, "versão FDT incompatível"
     if off_struct < HEADER_SIZE or off_strings < HEADER_SIZE or off_rsvmap < HEADER_SIZE:
         return False, "offset FDT aponta para dentro do cabeçalho"
+    if off_struct % 4 or off_strings % 4 or off_rsvmap % 8:
+        return False, "alinhamento dos offsets FDT inválido"
     if off_struct + size_struct > total or off_strings + size_strings > total:
         return False, "seções FDT ultrapassam o tamanho declarado"
-    if off_rsvmap >= total:
-        return False, "mapa de reservas FDT fora dos limites"
+    if size_struct < 4:
+        return False, "bloco de estrutura FDT vazio ou truncado"
+    if max(off_struct, off_strings) < min(off_struct + size_struct, off_strings + size_strings):
+        return False, "seções de estrutura e strings FDT sobrepostas"
+    # Reservation map is a sequence of big-endian (address, size) 64-bit pairs.
+    # It must terminate with the 16-byte zero entry before the declared blob end.
+    cursor = off_rsvmap
+    terminated = False
+    while cursor + 16 <= total:
+        address, size = struct.unpack_from(">QQ", data, cursor)
+        cursor += 16
+        if address == 0 and size == 0:
+            terminated = True
+            break
+    if not terminated:
+        return False, "mapa de reservas FDT sem terminador válido"
+    if not (cursor <= off_struct or off_rsvmap >= off_struct + size_struct):
+        return False, "mapa de reservas sobrepõe bloco de estrutura"
+    if not (cursor <= off_strings or off_rsvmap >= off_strings + size_strings):
+        return False, "mapa de reservas sobrepõe bloco de strings"
     return True, f"FDT estruturalmente consistente ({total} bytes)"
 
 
