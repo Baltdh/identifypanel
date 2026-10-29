@@ -20,6 +20,27 @@ jobs:
           python -m py_compile identifypanel.py tools/fetch_official_profiles.py tools/select_profile.py
           python -m unittest discover -s tests -v
           python identifypanel.py profiles --profiles profiles/official
+      - name: Require at least one validated DTBO
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path("profiles/official")
+          manifest_path = root / "manifest.json"
+          if not manifest_path.is_file():
+              raise SystemExit("ERRO: manifesto de perfis não foi gerado.")
+          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+          profiles = manifest.get("profiles")
+          if not isinstance(profiles, list) or not profiles:
+              raise SystemExit("ERRO: nenhum perfil DTBO validado; pacote offline cancelado.")
+          listed = {item.get("file") for item in profiles if isinstance(item, dict)}
+          actual = {p.name for p in root.iterdir() if p.is_file() and
+                    (p.suffix == ".dtbo" or ".dtbo." in p.name)}
+          if not listed or not listed.issubset(actual):
+              raise SystemExit("ERRO: manifesto e arquivos DTBO não correspondem.")
+          print(f"OK: {len(listed)} perfis DTBO validados e presentes.")
+          PY
       - name: Assemble complete offline folder
         run: |
           mkdir -p IdentifyPanel-Offline/tools IdentifyPanel-Offline/profiles
