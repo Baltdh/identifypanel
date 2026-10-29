@@ -4,7 +4,7 @@ import unittest
 from identifypanel import HEADER_SIZE, MAGIC, validate_fdt_bytes
 
 
-def make_fdt(total=64, off_struct=40, off_strings=48, off_rsvmap=56,
+def make_fdt(total=80, off_struct=40, off_strings=64, off_rsvmap=48,
              version=17, last_comp=16, size_strings=8, size_struct=8):
     return MAGIC + struct.pack(">9I", total, off_struct, off_strings, off_rsvmap,
                                version, last_comp, 0, size_strings, size_struct) + b"\0" * (total - HEADER_SIZE)
