@@ -24,7 +24,7 @@ No ROCKNIX, abra um terminal na pasta extraída:
 ./Selecionar-Tela.sh /CAMINHO/DA/PARTICAO-ROCKNIX
 ```
 
-Se o caminho não for informado, o script tenta localizar os caminhos comuns `/flash`, `/storage/ROCKNIX` e `/ROCKNIX`, e depois pergunta o caminho manualmente. O programa exige Python 3 e permissão de escrita na partição.
+Se o caminho não for informado, o script tenta localizar os caminhos comuns `/flash`, `/storage/ROCKNIX` e `/ROCKNIX`, e depois pergunta o caminho manualmente. O programa exige Python 3 e permissão de escrita na partição. O menu tenta remontar temporariamente a partição para escrita quando ela está montada como somente leitura e volta a somente leitura ao terminar cada operação. Comandos diretos do Python não fazem esse remount automaticamente.
 
 1. Selecione um único perfil e digite `TESTAR`.
 2. O perfil será instalado como `overlays/mipi-panel.dtbo`, com estado **pendente**, para ser carregado no próximo boot.
