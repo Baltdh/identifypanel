@@ -30,7 +30,7 @@ class FdtValidationTests(unittest.TestCase):
         self.assertFalse(ok)
 
     def test_rejects_section_outside_blob(self):
-        ok, _ = validate_fdt_bytes(make_fdt(off_struct=60, size_struct=16))
+        ok, _ = validate_fdt_bytes(make_fdt(off_struct=72, size_struct=16))
         self.assertFalse(ok)
 
     def test_rejects_invalid_version(self):
