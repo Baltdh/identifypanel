@@ -1,4 +1,4 @@
-name: Fetch official panel profiles
+name: Build offline IdentifyPanel package
 on:
   workflow_dispatch:
   schedule:
@@ -6,22 +6,64 @@ on:
 permissions:
   contents: read
 jobs:
-  fetch-profiles:
+  build-offline-package:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Download and validate every official DTBO asset
+      - name: Download and validate official DTBO profiles
         run: python tools/fetch_official_profiles.py --output profiles/official
-      - name: Package verified profiles and manifest
+      - name: Run validation and compile checks
         run: |
-          cd profiles
-          zip -r ../IdentifyPanel-ROCKNIX-official-profiles.zip official
+          python -m py_compile identifypanel.py tools/fetch_official_profiles.py tools/select_profile.py
+          python -m unittest discover -s tests -v
+          python identifypanel.py profiles --profiles profiles/official
+      - name: Assemble complete offline folder
+        run: |
+          mkdir -p IdentifyPanel-Offline/tools IdentifyPanel-Offline/profiles
+          cp identifypanel.py IdentifyPanel-Offline/
+          cp README.md IdentifyPanel-Offline/
+          cp tools/select_profile.py IdentifyPanel-Offline/tools/
+          cp -r profiles/official IdentifyPanel-Offline/profiles/
+          cat > IdentifyPanel-Offline/Selecionar-Perfil.sh <<'EOF'
+          #!/bin/sh
+          HERE="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+          if ! command -v python3 >/dev/null 2>&1; then
+            echo "Python 3 não está disponível neste sistema."
+            echo "Use o pacote em um computador com Python 3 ou instale Python 3 no ROCKNIX."
+            read -r _
+            exit 1
+          fi
+          exec python3 "$HERE/tools/select_profile.py" --boot "${1:-/flash}"
+          EOF
+          chmod +x IdentifyPanel-Offline/Selecionar-Perfil.sh
+          cat > IdentifyPanel-Offline/LEIA-ME-OFFLINE.txt <<'EOF'
+          IDENTIFYPANEL — PACOTE OFFLINE
+          
+          Esta pasta já contém os perfis DTBO incluídos na montagem deste pacote.
+          Não é necessário baixar os perfis no R36H.
+          
+          No ROCKNIX, aponte o seletor para a partição que contém a pasta overlays:
+            ./Selecionar-Perfil.sh /flash
+          
+          O caminho /flash é apenas o padrão inicial; confirme o ponto de montagem
+          da sua versão ROCKNIX antes de aplicar.
+          
+          Requisitos: Python 3 disponível no sistema. Se não existir, use o pacote
+          em um computador para preparar a partição. Não altere o DTB principal.
+          Faça um teste por vez e preserve o cartão original.
+          
+          Perfis publicados para R35S/R36S não são automaticamente compatíveis com R36H.
+          A validação estrutural não confirma imagem; cada perfil exige teste visual.
+          EOF
+          cp profiles/official/manifest.json IdentifyPanel-Offline/
+          cd IdentifyPanel-Offline
+          zip -r ../IdentifyPanel-Offline.zip .
       - uses: actions/upload-artifact@v4
         with:
-          name: IdentifyPanel-ROCKNIX-official-profiles
-          path: IdentifyPanel-ROCKNIX-official-profiles.zip
+          name: IdentifyPanel-Offline-R36H
+          path: IdentifyPanel-Offline.zip
           if-no-files-found: error
           retention-days: 90
