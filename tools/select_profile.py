@@ -20,7 +20,10 @@ def main():
     if not profiles_dir.is_dir():
         raise SystemExit(f"Pasta de perfis não encontrada: {profiles_dir}")
 
-    files = sorted(p for p in profiles_dir.rglob("*") if p.is_file() and\n                   (p.suffix == ".dtbo" or ".dtbo." in p.name))
+    files = sorted(
+        p for p in profiles_dir.rglob("*")
+        if p.is_file() and (p.suffix == ".dtbo" or ".dtbo." in p.name)
+    )
     valid = []
     print("\nIDENTIFYPANEL — PERFIS LOCAIS")
     print("Nenhum download será feito neste menu.\n")
