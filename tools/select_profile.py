@@ -95,7 +95,10 @@ def main():
     selected = valid[choice - 1]
     if input(f"Digite TESTAR para preparar {selected.name}: ").strip() != "TESTAR":
         raise SystemExit("Cancelado.")
-    apply(SimpleNamespace(boot=str(boot), dtbo=str(selected), name=selected.name))
+    stage(SimpleNamespace(boot=str(boot), dtbo=str(selected), name=selected.name))
+    print("Reinicie para testar. Só confirme depois de ver a imagem funcionando.")
+    print("Confirmação: python3 identifypanel.py confirm --boot CAMINHO")
+    print("Se falhar mas o sistema iniciar: python3 identifypanel.py rollback --boot CAMINHO")
 
 if __name__ == "__main__":
     main()
