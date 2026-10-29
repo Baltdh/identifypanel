@@ -98,6 +98,7 @@ while :; do
     echo
     echo " C) Confirmar perfil pendente (somente após ver a imagem funcionando)"
     echo " F) Rejeitar teste e restaurar o overlay anterior"
+    echo " I) Inspecionar arquivos de boot (somente leitura)"
     echo " R) Restaurar o overlay original anterior ao IdentifyPanel"
     echo " 0) Sair"
     printf "Escolha o número do perfil ou uma ação: "
@@ -118,6 +119,9 @@ while :; do
             else
                 echo "Rollback não concluído. Preserve o cartão e consulte o diagnóstico."
             fi
+            ;;
+        I|i)
+            "$PYTHON" "$APP" boot-info --boot "$BOOT"
             ;;
         R|r)
             if run_write "$PYTHON" "$APP" restore --boot "$BOOT"; then
