@@ -15,7 +15,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Compile
-        run: python -m py_compile identifypanel.py tools/fetch_official_profiles.py
+        run: python -m py_compile identifypanel.py tools/fetch_official_profiles.py tools/select_profile.py
       - name: Unit tests
         run: python -m unittest discover -s tests -v
       - name: CLI smoke test
