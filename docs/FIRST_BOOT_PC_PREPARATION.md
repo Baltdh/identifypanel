@@ -59,11 +59,7 @@ A informação de que Panel 4 funcionava no DarkOS é útil. O melhor artefato p
 2. Extraia do backup a partição BOOT e localize o DTB Linux efetivamente usado, normalmente chamado `rk3326-r36s-linux.dtb` em firmwares desta família. Não confundir com `rg351mp-uboot.dtb`, usado por alguns bootloaders para display inicial.
 3. Grave a imagem ROCKNIX RK3326 em um cartão de teste, mas ainda não o coloque no console.
 4. No PC, abra a partição de boot da nova imagem e inspecione `extlinux/extlinux.conf`, o DTB selecionado (se indicado por `FDT`) e os arquivos de boot. Não altere o DTB base nem o U-Boot.
-5. Gere e instale o overlay no PC com a ferramenta incluída no IdentifyPanel. Primeiro instale a dependência:
-   
-```sh
-python -m pip install fdt
-```
+5. Gere e instale o overlay no PC com a ferramenta incluída no ZIP IdentifyPanel. O pacote offline já inclui PyFDT (`fdt==0.3.3`) em `tools/vendor`; basta ter Python 3 no computador. Não é necessário instalar dependências nem ter internet. Para um checkout do código-fonte fora do ZIP, instale `fdt` com `python -m pip install fdt==0.3.3`.
 
 Faça uma prévia (não grava nada):
 ```sh
