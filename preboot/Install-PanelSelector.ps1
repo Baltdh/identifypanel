@@ -41,12 +41,15 @@ $ExtlinuxText = Get-Content -LiteralPath $Extlinux -Raw
 if ($ExtlinuxText -notmatch '(?m)^\s*FDTOVERLAYS\s+/overlays/mipi-panel\.dtbo\s*$') {
     Fail "extlinux.conf nao aponta para /overlays/mipi-panel.dtbo; instalacao cancelada."
 }
-if ($ExtlinuxText -notmatch '(?m)^\s*FDT\s+(/[^#\s]+\.dtb)\s*$') {
-    Fail "R36H exige uma diretiva FDT explicita em extlinux.conf. Prepare o DTB base no PC antes de instalar o seletor."
+$FdtMatches = [regex]::Matches($ExtlinuxText, '(?m)^\s*FDT\s+(/[^#\s]+\.dtb)\s*$')
+if ($FdtMatches.Count -ne 1) {
+    Fail "R36H exige exatamente uma diretiva FDT explicita em extlinux.conf."
 }
-$FdtRelative = $Matches[1].TrimStart("/") -replace "/", [System.IO.Path]::DirectorySeparatorChar
+$FdtRelative = $FdtMatches[0].Groups[1].Value.TrimStart("/") -replace "/", [System.IO.Path]::DirectorySeparatorChar
 $FdtPath = Join-Path $BootRoot $FdtRelative
-if (!(Test-Path -LiteralPath $FdtPath -PathType Leaf)) { Fail "O DTB base indicado por FDT nao existe na particao: $FdtRelative" }
+if (!(Test-Path -LiteralPath $FdtPath -PathType Leaf)) {
+    Fail "O DTB base indicado por FDT nao existe na particao: $FdtRelative"
+}
 if (!(Test-Path -LiteralPath $SelectorScr -PathType Leaf)) { Fail "PanelSelector.scr nao foi gerado pelo pacote de build." }
 if (!(Test-Path -LiteralPath $OfficialProfiles -PathType Container)) { Fail "profiles\official nao foi encontrado dentro do pacote." }
 
