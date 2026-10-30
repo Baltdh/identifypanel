@@ -65,9 +65,11 @@ def verify_catalog_file(path):
     """Verify a catalog DTBO against its adjacent manifest when one is present."""
     path = Path(path)
     manifest_path = path.parent / "manifest.json"
+    if manifest_path.is_symlink():
+        return False, "manifesto local é link simbólico"
     if not manifest_path.exists():
         return True, "sem manifesto local; validação FDT será aplicada"
-    if manifest_path.is_symlink() or not manifest_path.is_file():
+    if not manifest_path.is_file():
         return False, "manifesto local inseguro"
     try:
         data = json.loads(manifest_path.read_text(encoding="utf-8"))
