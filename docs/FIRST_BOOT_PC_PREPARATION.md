@@ -59,18 +59,30 @@ A informação de que Panel 4 funcionava no DarkOS é útil. O melhor artefato p
 2. Extraia do backup a partição BOOT e localize o DTB Linux efetivamente usado, normalmente chamado `rk3326-r36s-linux.dtb` em firmwares desta família. Não confundir com `rg351mp-uboot.dtb`, usado por alguns bootloaders para display inicial.
 3. Grave a imagem ROCKNIX RK3326 em um cartão de teste, mas ainda não o coloque no console.
 4. No PC, abra a partição de boot da nova imagem e inspecione `extlinux/extlinux.conf`, o DTB selecionado (se indicado por `FDT`) e os arquivos de boot. Não altere o DTB base nem o U-Boot.
-5. Execute o importador oficial ROCKNIX no PC sobre o DTB original do DarkOS:
-
+5. Gere e instale o overlay no PC com a ferramenta incluída no IdentifyPanel. Primeiro instale a dependência:
+   
 ```sh
-python importpanel.py -O dtbo -o mipi-panel.dtbo /caminho/para/rk3326-r36s-linux.dtb
+python -m pip install fdt
 ```
 
-O importador requer Python e a biblioteca PyFDT (`fdt`). Obtenha o script no repositório ROCKNIX indicado acima. O script pode rodar no PC; não precisa ser executado no R36H.
+Faça uma prévia (não grava nada):
+```sh
+python tools/prepare_first_boot.py --stock-dtb /caminho/para/rk3326-r36s-linux.dtb --boot /caminho/da/particao-BOOT
+```
+
+Se `extlinux.conf` tiver uma diretiva `FDT /arquivo.dtb` ativa, a ferramenta consegue inferir o DTB base. Se não tiver um `FDT` único e explícito, informe `--base-dtb` com o arquivo que o boot script/U-Boot realmente carrega. Não escolha esse arquivo só pelo nome do console.
+
+Depois de conferir a prévia, repita com `--install`:
+```sh
+python tools/prepare_first_boot.py --stock-dtb /caminho/para/rk3326-r36s-linux.dtb --boot /caminho/da/particao-BOOT --base-dtb rk3326-gameconsole-r36s.dtb --install
+```
+
+O exemplo de `--base-dtb` é apenas ilustrativo; use o DTB comprovadamente selecionado na imagem gravada. O script verifica a diretiva `FDTOVERLAYS`, gera o arquivo com `tools/importpanel.py`, confirma que `target-path` existe no DTB base, faz backup de um overlay anterior e instala em `overlays/mipi-panel.dtbo`. Sem `--install`, nenhum arquivo é modificado.
+
 6. Antes de instalar o resultado, confirme que o DTB base que o novo ROCKNIX realmente selecionará contém o nó alvo apontado pelo overlay (`/dsi@ff450000/panel@0` ou `/dsi@fe060000/panel@0`). Se a configuração de boot não deixar claro qual DTB será carregado, pare e resolva essa seleção no PC; não escolha um DTB aleatório.
 7. Faça backup de qualquer `overlays/mipi-panel.dtbo` existente na partição de boot.
 8. Copie o DTBO gerado para o caminho exato `overlays/mipi-panel.dtbo`. O `extlinux.conf` oficial aponta para esse nome e caminho.
 9. Ejete o cartão com segurança. Só então faça o primeiro boot.
-
 ### Se o DTB original do DarkOS não estiver disponível
 
 Use a revisão real da motherboard para escolher o DTB comunitário específico HL-R36H-V20 ou HL-R36H-V21 como fonte de importação, depois gere o overlay com o importador ROCKNIX. Não use o perfil R36S Panel 4 como substituto automático. As duas revisões R36H listadas não compartilham os mesmos timings.
