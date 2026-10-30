@@ -6,6 +6,7 @@ from tools.prepare_first_boot import (
     active_extlinux_value,
     fdt_string,
     parse_fdt,
+    pin_extlinux_fdt,
 )
 
 
@@ -95,6 +96,61 @@ class FirstBootFdtTests(unittest.TestCase):
             active_extlinux_value(conf, "FDT"),
             ["/rk3326-gameconsole-r36s.dtb"],
         )
+
+
+    def test_pins_base_dtb_before_overlay_when_fdt_is_automatic(self):
+        conf = (
+            "LABEL ROCKNIX\n"
+            "  LINUX /KERNEL\n"
+            "  FDTDIR /\n"
+            "  FDTOVERLAYS /overlays/mipi-panel.dtbo\n"
+            "  APPEND quiet\n"
+        )
+        updated, changed = pin_extlinux_fdt(conf, "rk3326-gameconsole-r36s.dtb")
+        self.assertTrue(changed)
+        self.assertIn("  FDT /rk3326-gameconsole-r36s.dtb\n", updated)
+        self.assertEqual(
+            active_extlinux_value(updated, "FDT"),
+            ["/rk3326-gameconsole-r36s.dtb"],
+        )
+        self.assertEqual(
+            active_extlinux_value(updated, "FDTOVERLAYS"),
+            ["/overlays/mipi-panel.dtbo"],
+        )
+
+    def test_preserves_windows_line_endings_when_pinning_fdt(self):
+        conf = (
+            "LABEL ROCKNIX\r\n"
+            "  FDTDIR /\r\n"
+            "  FDTOVERLAYS /overlays/mipi-panel.dtbo\r\n"
+        )
+        updated, changed = pin_extlinux_fdt(conf, "rk3326-gameconsole-r36s.dtb")
+        self.assertTrue(changed)
+        self.assertIn("  FDT /rk3326-gameconsole-r36s.dtb\r\n", updated)
+
+    def test_keeps_an_already_matching_fdt_directive(self):
+        conf = (
+            "LABEL ROCKNIX\n"
+            "  FDT /rk3326-gameconsole-r36s.dtb\n"
+            "  FDTOVERLAYS /overlays/mipi-panel.dtbo\n"
+        )
+        updated, changed = pin_extlinux_fdt(conf, "rk3326-gameconsole-r36s.dtb")
+        self.assertFalse(changed)
+        self.assertEqual(updated, conf)
+
+    def test_rejects_mismatched_existing_fdt(self):
+        conf = (
+            "LABEL ROCKNIX\n"
+            "  FDT /rk3326-odroid-go2.dtb\n"
+            "  FDTOVERLAYS /overlays/mipi-panel.dtbo\n"
+        )
+        with self.assertRaises(PreparationError):
+            pin_extlinux_fdt(conf, "rk3326-gameconsole-r36s.dtb")
+
+    def test_rejects_base_dtb_path_that_extlinux_cannot_parse(self):
+        conf = "  FDTOVERLAYS /overlays/mipi-panel.dtbo\n"
+        with self.assertRaises(PreparationError):
+            pin_extlinux_fdt(conf, "dtb folder/gameconsole-r36s.dtb")
 
 
 if __name__ == "__main__":
