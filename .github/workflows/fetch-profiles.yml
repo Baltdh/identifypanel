@@ -88,6 +88,8 @@ jobs:
           é instalada como overlays/mipi-panel.dtbo. O estado de cada teste e os hashes
           ficam em .identifypanel/manifest.json. O perfil só é marcado como confirmado
           após a ação manual C; o programa não detecta pixels do LCD.
+          Use I no menu para inspecionar boot.ini, extlinux.conf e outros arquivos de boot
+          sem modificá-los; isso ajuda a definir uma futura recuperação pré-kernel segura.
           
           IMPORTANTE: o menu roda depois que o ROCKNIX iniciou. Se o kernel travar ou a
           tela impedir o acesso ao menu, Reset sozinho NÃO executará rollback. Será
