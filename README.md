@@ -76,4 +76,4 @@ sh -n Selecionar-Tela.sh
 python -m unittest discover -s tests -v
 ```
 
-Referências: [documentação ROCKNIX para R35S/R36S](https://rocknix.org/devices/unbranded/game-console-r35s-r36s/) e [release de perfis de painel](https://github.com/stolen/r.nix-distribution/releases/tag/panel_overlays).
+Referências: [documentação ROCKNIX para R35S/R36S](https://rocknix.org/devices/unbranded/game-console-r35s-r36s/) e [release de perfis de painel](https://github.com/stolen/rnix/releases/tag/panel_overlays).
