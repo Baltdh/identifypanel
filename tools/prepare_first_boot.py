@@ -140,7 +140,7 @@ def pin_extlinux_fdt(text: str, base_relative: str) -> tuple[str, bool]:
     """Add one explicit FDT directive when extlinux currently relies on U-Boot auto-detection."""
     if not base_relative or base_relative.startswith("/") or ".." in Path(base_relative).parts:
         raise PreparationError("Caminho relativo do DTB base inválido para extlinux.conf.")
-    if re.search(r"[\\s#]", base_relative):
+    if re.search(r"[\s#]", base_relative):
         raise PreparationError(
             "O caminho do DTB base contém espaço ou '#'; o parser extlinux do U-Boot pode falhar."
         )
@@ -159,13 +159,13 @@ def pin_extlinux_fdt(text: str, base_relative: str) -> tuple[str, bool]:
     lines = text.splitlines(keepends=True)
     overlay_indices = [
         i for i, raw in enumerate(lines)
-        if re.match(r"^\\s*FDTOVERLAYS\\s+", raw.split("#", 1)[0].strip(), re.IGNORECASE)
+        if re.match(r"^\s*FDTOVERLAYS\s+", raw.split("#", 1)[0].strip(), re.IGNORECASE)
     ]
     if len(overlay_indices) != 1:
         raise PreparationError(
             "Não foi possível localizar uma única diretiva FDTOVERLAYS para inserir FDT."
         )
-    newline = "\\r\\n" if "\\r\\n" in text else "\\n"
+    newline = "\r\n" if "\r\n" in text else "\n"
     directive = f"  FDT /{base_relative}{newline}"
     lines.insert(overlay_indices[0], directive)
     return "".join(lines), True
