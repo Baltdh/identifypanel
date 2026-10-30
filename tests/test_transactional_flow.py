@@ -107,6 +107,33 @@ class TransactionalPanelTests(unittest.TestCase):
         self.assertEqual(state["active_profile"], "original-backup")
         self.assertNotIn("pending", state)
 
+    def test_stage_rejects_catalog_hash_mismatch(self):
+        catalog = self.package / "manifest.json"
+        catalog.write_text(json.dumps({
+            "profiles": [{
+                "file": self.profile_a.name,
+                "size": self.profile_a.stat().st_size,
+                "sha256": "0" * 64,
+            }]
+        }))
+        with self.assertRaises(SystemExit):
+            stage(self.args())
+        self.assertEqual(self.active.read_bytes(), blob(0x11))
+        self.assertFalse((self.root / ".identifypanel" / "manifest.json").exists())
+
+    def test_profiles_rejects_catalog_hash_mismatch(self):
+        from identifypanel import profiles
+        catalog = self.package / "manifest.json"
+        catalog.write_text(json.dumps({
+            "profiles": [{
+                "file": self.profile_a.name,
+                "size": self.profile_a.stat().st_size,
+                "sha256": "0" * 64,
+            }]
+        }))
+        with self.assertRaises(SystemExit):
+            profiles(SimpleNamespace(profiles=str(self.package)))
+
     def test_corrupt_manifest_is_not_overwritten(self):
         state_dir = self.root / ".identifypanel"
         state_dir.mkdir()
