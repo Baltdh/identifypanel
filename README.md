@@ -4,9 +4,9 @@ Ferramenta offline para inspecionar e testar overlays LCD no ROCKNIX, com foco e
 
 ## Primeira inicialização do R36H (preparação no PC)
 
-O R36H não precisa iniciar um sistema para esta etapa. Antes de inserir o cartão no console, prepare o overlay na partição de boot usando o DTB Linux da instalação DarkOS que funcionava. O ROCKNIX carrega `overlays/mipi-panel.dtbo` antes do kernel quando o seu `extlinux.conf` contém `FDTOVERLAYS /overlays/mipi-panel.dtbo`.
+O R36H não precisa iniciar um sistema para esta etapa. Antes de inserir o cartão no console, prepare o overlay na partição de boot usando o DTB Linux da instalação DarkOS que funcionava. O ROCKNIX aplica `overlays/mipi-panel.dtbo` antes do kernel.
 
-**Comece por [docs/FIRST_BOOT_PC_PREPARATION.md](docs/FIRST_BOOT_PC_PREPARATION.md).** A nota explica como extrair o DTB original no computador, gerar o DTBO com o importador oficial ROCKNIX e validar o caminho de destino antes do primeiro power-on. Também documenta as diferenças encontradas entre DTBs públicos HL-R36H-V20, HL-R36H-V21 e R36S Panel 4. Não escolha um perfil R36S só pelo número “Panel 4”.
+**Comece por [docs/FIRST_BOOT_PC_PREPARATION.md](docs/FIRST_BOOT_PC_PREPARATION.md).** A ferramenta gera o DTBO com o importador ROCKNIX, verifica o nó de destino no DTB base e, quando o `extlinux.conf` não tem uma diretiva `FDT` ativa, adiciona `FDT /rk3326-gameconsole-r36s.dtb` para não depender da detecção ADC/GPIO do U-Boot no R36H. Ela faz backup do overlay e do `extlinux.conf` antes de gravar. O documento também explica as diferenças entre DTBs comunitários HL-R36H-V20, HL-R36H-V21 e R36S Panel 4. Não escolha um perfil R36S só pelo número “Panel 4”.
 
 ## Pacote offline
 
