@@ -8,6 +8,14 @@ O R36H não precisa iniciar um sistema para esta etapa. Antes de inserir o cart�
 
 **Comece por [docs/FIRST_BOOT_PC_PREPARATION.md](docs/FIRST_BOOT_PC_PREPARATION.md).** A ferramenta gera o DTBO com o importador ROCKNIX, verifica o nó de destino no DTB base e, quando o `extlinux.conf` não tem uma diretiva `FDT` ativa, adiciona `FDT /rk3326-gameconsole-r36s.dtb` para não depender da detecção ADC/GPIO do U-Boot no R36H. Ela faz backup do overlay e do `extlinux.conf` antes de gravar. O documento também explica as diferenças entre DTBs comunitários HL-R36H-V20, HL-R36H-V21 e R36S Panel 4. Não escolha um perfil R36S só pelo número “Panel 4”.
 
+## Seletor antes do ROCKNIX (beta experimental)
+
+Existe um módulo de pré-boot para o **U-Boot legado da variante A**: segure R1 durante a partida para abrir o menu de perfis, escolha com o direcional/ABXY e o wrapper só então chama o script original do ROCKNIX. O instalador preserva o boot original como `boot0.scr` e o overlay de referência como `IPANEL/BASE.DTBO`.
+
+**Não use na variante B/mainline.** O mapa de botões vem de uma referência R36S e ainda precisa ser confirmado na revisão R36H; a tela só aparece antes do kernel se o U-Boot conseguir inicializar o LCD. O pacote não troca o binário do bootloader nem grava setores raw.
+
+Leia [docs/PREBOOT_SELECTOR.md](docs/PREBOOT_SELECTOR.md) antes de instalar. O instalador exige um `FDT` explícito e o overlay ROCKNIX esperado. Para remover, restaure `boot0.scr` usando `preboot/Restore-Original-Boot.ps1`.
+
 ## Pacote offline
 
 O workflow **Build offline IdentifyPanel package** baixa os DTBOs publicados que passam na validação estrutural, salva os hashes e monta o ZIP offline.
