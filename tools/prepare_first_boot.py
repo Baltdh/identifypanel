@@ -298,7 +298,16 @@ def main() -> int:
                 str(generated),
                 str(stock),
             ]
-            result = subprocess.run(command, capture_output=True, text=True, check=False)
+            env = os.environ.copy()
+            vendor_dir = Path(__file__).resolve().parent / "vendor"
+            if vendor_dir.is_dir():
+                existing_pythonpath = env.get("PYTHONPATH")
+                env["PYTHONPATH"] = str(vendor_dir) + (
+                    os.pathsep + existing_pythonpath if existing_pythonpath else ""
+                )
+            result = subprocess.run(
+                command, capture_output=True, text=True, check=False, env=env
+            )
             if result.returncode != 0 or not generated.is_file():
                 detail = (result.stderr or result.stdout or "").strip()
                 if "No module named 'fdt'" in detail:
