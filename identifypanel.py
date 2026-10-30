@@ -61,6 +61,46 @@ def validate_fdt_bytes(data):
     return True, f"FDT estruturalmente consistente ({total} bytes)"
 
 
+def verify_catalog_file(path):
+    """Verify a catalog DTBO against its adjacent manifest when one is present."""
+    path = Path(path)
+    manifest_path = path.parent / "manifest.json"
+    if not manifest_path.exists():
+        return True, "sem manifesto local; validação FDT será aplicada"
+    if manifest_path.is_symlink() or not manifest_path.is_file():
+        return False, "manifesto local inseguro"
+    try:
+        data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return False, f"manifesto local inválido: {exc}"
+    entries = data.get("profiles") if isinstance(data, dict) else None
+    if not isinstance(entries, list):
+        return False, "manifesto local sem lista de perfis"
+    matches = [entry for entry in entries
+               if isinstance(entry, dict) and entry.get("file") == path.name]
+    if len(matches) != 1:
+        return False, "arquivo não consta exatamente uma vez no manifesto local"
+    entry = matches[0]
+    expected_hash = entry.get("sha256")
+    if not isinstance(expected_hash, str) or len(expected_hash) != 64:
+        return False, "SHA-256 ausente ou inválido no manifesto"
+    try:
+        int(expected_hash, 16)
+    except ValueError:
+        return False, "SHA-256 contém caracteres inválidos"
+    expected_size = entry.get("size")
+    try:
+        actual_size = path.stat().st_size
+        actual_hash = digest(path)
+    except OSError as exc:
+        return False, f"não foi possível ler DTBO do catálogo: {exc}"
+    if isinstance(expected_size, int) and actual_size != expected_size:
+        return False, f"tamanho divergente do manifesto ({actual_size} != {expected_size})"
+    if actual_hash.lower() != expected_hash.lower():
+        return False, "SHA-256 do DTBO diverge do manifesto"
+    return True, "integridade SHA-256 do catálogo confirmada"
+
+
 def check(path):
     try:
         return validate_fdt_bytes(path.read_bytes())
@@ -214,9 +254,19 @@ def profiles(args):
     if not files:
         print("Nenhum DTBO encontrado. Execute tools/fetch_official_profiles.py.")
         return
+    invalid = 0
     for path in files:
+        catalog_ok, catalog_message = verify_catalog_file(path)
         ok, message = check(path)
+        if not catalog_ok:
+            ok, message = False, catalog_message
+        elif ok:
+            message = catalog_message + "; " + message
+        if not ok:
+            invalid += 1
         print(("OK" if ok else "INVÁLIDO"), path, digest(path), message)
+    if invalid:
+        raise SystemExit(f"{invalid} perfil(is) falharam na verificação do catálogo/FDT.")
 
 
 def stage(args):
@@ -225,6 +275,9 @@ def stage(args):
     source = Path(args.dtbo).resolve()
     if not root.is_dir() or not source.is_file():
         raise SystemExit("Caminho da partição ou DTBO não existe.")
+    catalog_ok, catalog_message = verify_catalog_file(source)
+    if not catalog_ok:
+        raise SystemExit("DTBO recusado: " + catalog_message)
     ok, message = check(source)
     if not ok:
         raise SystemExit("DTBO recusado: " + message)
