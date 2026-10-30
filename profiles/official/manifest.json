@@ -1,0 +1,91 @@
+{
+  "source": "https://api.github.com/repos/stolen/rnix/releases/tags/panel_overlays",
+  "tag": "panel_overlays",
+  "release_name": "panel dtb overlays",
+  "published_at": "2024-07-04T22:11:09Z",
+  "assets_found": 9,
+  "dtbo_candidates": 9,
+  "profiles": [
+    {
+      "file": "mipi-panel.dtbo.cb408",
+      "size": 1605,
+      "sha256": "2a0a010522c955b0c6909d10fce6e106c17ec3f7bac86b49ebb3880a692d9ca4",
+      "asset_id": 213772991,
+      "source_url": "https://github.com/stolen/rnix/releases/download/panel_overlays/mipi-panel.dtbo.cb408",
+      "validation": "FDT estruturalmente consistente (1605 bytes)",
+      "compatibility": "unverified-on-R36H"
+    },
+    {
+      "file": "mipi-panel.dtbo.r36s-panel1",
+      "size": 1565,
+      "sha256": "c2005751c98cd505c686d65d18308ad1abe105a9bd86c6beef87b35a22938054",
+      "asset_id": 177751191,
+      "source_url": "https://github.com/stolen/rnix/releases/download/panel_overlays/mipi-panel.dtbo.r36s-panel1",
+      "validation": "FDT estruturalmente consistente (1565 bytes)",
+      "compatibility": "unverified-on-R36H"
+    },
+    {
+      "file": "mipi-panel.dtbo.r36s-panel2",
+      "size": 5745,
+      "sha256": "8d1dddc717f7b3aceeadc063209bf4f235092a37268e9549b7a92a5d848aa767",
+      "asset_id": 177751194,
+      "source_url": "https://github.com/stolen/rnix/releases/download/panel_overlays/mipi-panel.dtbo.r36s-panel2",
+      "validation": "FDT estruturalmente consistente (5745 bytes)",
+      "compatibility": "unverified-on-R36H"
+    },
+    {
+      "file": "mipi-panel.dtbo.r36s-panel3",
+      "size": 5773,
+      "sha256": "364921615dffcb772e33c6cfbe5af0d7079dbc9a22ca71a3fab0ab96e03b31a2",
+      "asset_id": 177751196,
+      "source_url": "https://github.com/stolen/rnix/releases/download/panel_overlays/mipi-panel.dtbo.r36s-panel3",
+      "validation": "FDT estruturalmente consistente (5773 bytes)",
+      "compatibility": "unverified-on-R36H"
+    },
+    {
+      "file": "mipi-panel.dtbo.r36s-panel4",
+      "size": 4865,
+      "sha256": "846ee139c96f0c121116234c63025b97cf3f4f947147e6761185ab965f4b77f3",
+      "asset_id": 177751198,
+      "source_url": "https://github.com/stolen/rnix/releases/download/panel_overlays/mipi-panel.dtbo.r36s-panel4",
+      "validation": "FDT estruturalmente consistente (4865 bytes)",
+      "compatibility": "unverified-on-R36H"
+    },
+    {
+      "file": "mipi-panel.dtbo.r36s_clone",
+      "size": 1837,
+      "sha256": "cb5f6fd860c7fbb82e2bc6b07c7e1db197388dbe9df74bfde5c28c3b3be9e743",
+      "asset_id": 249927746,
+      "source_url": "https://github.com/stolen/rnix/releases/download/panel_overlays/mipi-panel.dtbo.r36s_clone",
+      "validation": "FDT estruturalmente consistente (1837 bytes)",
+      "compatibility": "unverified-on-R36H"
+    },
+    {
+      "file": "mipi-panel.dtbo.rg351mp-v2",
+      "size": 6521,
+      "sha256": "c155d96eaa2b8efeae0dfd8bab2dd33b72a8c0b4e69d765d6d48c9dc22aa520a",
+      "asset_id": 192211251,
+      "source_url": "https://github.com/stolen/rnix/releases/download/panel_overlays/mipi-panel.dtbo.rg351mp-v2",
+      "validation": "FDT estruturalmente consistente (6521 bytes)",
+      "compatibility": "unverified-on-R36H"
+    },
+    {
+      "file": "mipi-panel.dtbo.rg351v-v2",
+      "size": 2673,
+      "sha256": "71e390a6c3ef682c391918d8b6c4e1f9009f62ac0de210b654960d33d7353a4a",
+      "asset_id": 179571933,
+      "source_url": "https://github.com/stolen/rnix/releases/download/panel_overlays/mipi-panel.dtbo.rg351v-v2",
+      "validation": "FDT estruturalmente consistente (2673 bytes)",
+      "compatibility": "unverified-on-R36H"
+    },
+    {
+      "file": "mipi-panel.dtbo.x35s",
+      "size": 2717,
+      "sha256": "73f66437fee099f278d98984984cefc8a348e14255dff8d7a0ed916afe964b95",
+      "asset_id": 184201320,
+      "source_url": "https://github.com/stolen/rnix/releases/download/panel_overlays/mipi-panel.dtbo.x35s",
+      "validation": "FDT estruturalmente consistente (2717 bytes)",
+      "compatibility": "unverified-on-R36H"
+    }
+  ]
+}

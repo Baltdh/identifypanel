@@ -1,0 +1,136 @@
+name: Build offline IdentifyPanel package
+on:
+  workflow_dispatch:
+  push:
+    branches: [autopanel-core]
+    paths:
+      - ".github/workflows/fetch-profiles.yml"
+      - "identifypanel.py"
+      - "Selecionar-Tela.sh"
+      - "README.md"
+      - "tools/**"
+      - "tests/**"
+      - "docs/**"
+  schedule:
+    - cron: "17 8 1 * *"
+permissions:
+  contents: write
+jobs:
+  build-offline-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Download and validate every published official DTBO
+        run: python tools/fetch_official_profiles.py --output profiles/official
+      - name: Verify manifest, hashes, FDT files, and shell syntax
+        run: |
+          python -m py_compile identifypanel.py tools/fetch_official_profiles.py tools/select_profile.py tools/prepare_first_boot.py tools/importpanel.py
+          sh -n Selecionar-Tela.sh
+          python -m unittest discover -s tests -v
+          python identifypanel.py profiles --profiles profiles/official
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          root = Path("profiles/official")
+          manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+          profiles = manifest.get("profiles")
+          if not isinstance(profiles, list) or not profiles:
+              raise SystemExit("ERRO: nenhum perfil DTBO validado.")
+          seen = set()
+          for item in profiles:
+              name = item.get("file")
+              expected = item.get("sha256")
+              if not isinstance(name, str) or Path(name).name != name or name in seen:
+                  raise SystemExit(f"ERRO: nome duplicado ou inseguro: {name!r}")
+              seen.add(name)
+              path = root / name
+              if not path.is_file():
+                  raise SystemExit(f"ERRO: arquivo ausente: {name}")
+              actual = hashlib.sha256(path.read_bytes()).hexdigest()
+              if actual != expected:
+                  raise SystemExit(f"ERRO: SHA256 divergente: {name}")
+          actual_files = {p.name for p in root.iterdir() if p.is_file() and
+                          (p.suffix == ".dtbo" or ".dtbo." in p.name)}
+          if actual_files != seen:
+              raise SystemExit("ERRO: há DTBOs não listados ou ausentes no manifesto.")
+          print(f"OK: {len(seen)} DTBOs validados e hashes conferidos.")
+          PY
+      - name: Store downloaded profiles in this GitHub branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add profiles/official
+          if ! git diff --cached --quiet; then
+            git commit -m "Update official ROCKNIX panel profiles"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          else
+            echo "Perfis já estão atualizados."
+          fi
+      - name: Assemble complete offline folder
+        run: |
+          mkdir -p IdentifyPanel-Offline/tools IdentifyPanel-Offline/profiles IdentifyPanel-Offline/docs
+          cp identifypanel.py IdentifyPanel-Offline/
+          cp README.md IdentifyPanel-Offline/
+          cp Selecionar-Tela.sh IdentifyPanel-Offline/
+          cp tools/select_profile.py IdentifyPanel-Offline/tools/
+          cp docs/FIRST_BOOT_PC_PREPARATION.md IdentifyPanel-Offline/docs/
+          cp tools/prepare_first_boot.py IdentifyPanel-Offline/tools/
+          cp tools/importpanel.py IdentifyPanel-Offline/tools/
+          python -m pip install --disable-pip-version-check --no-compile --target IdentifyPanel-Offline/tools/vendor "fdt==0.3.3"
+          PYTHONPATH="IdentifyPanel-Offline/tools/vendor" python -c "import fdt; print('PyFDT offline dependency OK')"
+          cp -r profiles/official IdentifyPanel-Offline/profiles/
+          chmod +x IdentifyPanel-Offline/Selecionar-Tela.sh
+          cat > IdentifyPanel-Offline/LEIA-ME-OFFLINE.txt <<'EOF'
+          IDENTIFYPANEL — PRIMEIRO BOOT NO R36H E MENU OFFLINE
+          
+          PARTE A — PREPARAR A PRIMEIRA INICIALIZAÇÃO NO PC (RECOMENDADO)
+          Esta etapa não exige que o R36H tenha um sistema funcionando.
+          1. Preserve o cartão/backup DarkOS que funcionava.
+          2. Extraia da instalação antiga o DTB Linux efetivamente usado pela tela.
+          3. Grave a imagem ROCKNIX RK3326 em um cartão de teste, mas não ligue o console.
+          4. No PC, monte a partição de boot e verifique extlinux/extlinux.conf.
+          5. O pacote já inclui PyFDT em tools/vendor. Basta ter Python 3 instalado no PC.
+          6. Se extlinux.conf declarar um único FDT explícito:
+             python tools/prepare_first_boot.py --stock-dtb CAMINHO_DO_DTB_DARKOS --boot CAMINHO_DA_PARTICAO_BOOT --install
+             Caso contrário, informe --base-dtb CAMINHO_RELATIVO_DO_DTB_BASE que o U-Boot realmente selecionará.
+          7. O programa usa a dependência PyFDT que acompanha o pacote, gera o overlay
+             com o importador ROCKNIX e verifica o alvo no DTB base,
+             guarda backup do overlay anterior e instala overlays/mipi-panel.dtbo.
+          8. Ejete o cartão com segurança. Só então faça o primeiro boot.
+          NÃO escolha o DTB base pelo nome do console; confirme a seleção do boot script.
+          Se a imagem não selecionar um DTB de forma verificável, pare e inspecione no PC.
+          
+          PARTE B — MENU DE TESTE PÓS-BOOT (quando o ROCKNIX já inicia)
+          1. Extraia a pasta completa no cartão/armazenamento.
+          2. Abra um terminal no ROCKNIX e execute:
+             cd /CAMINHO/IdentifyPanel-Offline
+             ./Selecionar-Tela.sh /CAMINHO/DA/PARTICAO-ROCKNIX
+          3. Escolha um perfil e digite TESTAR para deixá-lo pendente para o próximo boot.
+          4. Reinicie o console e verifique a imagem fisicamente.
+          5. Se a imagem funcionar, abra o menu e use C para confirmar.
+          6. Se o sistema iniciar com imagem errada, use F para rollback, reinicie
+             e só então escolha o próximo perfil.
+          7. Use R para restaurar o overlay original anterior à primeira tentativa.
+          
+          IMPORTANTE: o menu pós-boot não executa se a falha ocorre antes do sistema iniciar.
+          Reset sozinho NÃO faz rollback automático. A preparação da Parte A é o caminho
+          para configurar o painel antes do primeiro boot. O pacote ainda não implementa
+          troca automática de DTBOs no U-Boot.
+          
+          Os DTBOs de profiles/official são candidatos estruturais, não certificados para R36H.
+          Preserve o cartão original. Não grave DTB base, boot.scr ou setores raw do U-Boot.
+          EOF
+          cp profiles/official/manifest.json IdentifyPanel-Offline/
+          cd IdentifyPanel-Offline
+          zip -r ../IdentifyPanel-Offline.zip .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IdentifyPanel-Offline-R36H
+          path: IdentifyPanel-Offline.zip
+          if-no-files-found: error
+          retention-days: 90
