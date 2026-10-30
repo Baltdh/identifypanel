@@ -33,6 +33,14 @@ Se o caminho não for informado, o script tenta localizar os caminhos comuns `/f
 5. Se o sistema iniciar, mas a imagem estiver errada, use **F** para desfazer o teste; reinicie para carregar o overlay anterior e então teste outro perfil.
 6. Use **R** para voltar ao overlay capturado antes da primeira tentativa.
 
+O menu também oferece **I** para inspecionar os arquivos de boot de forma somente de leitura. O diagnóstico não altera o cartão e mostra se há arquivos como `boot.ini`, `boot.scr` ou `extlinux.conf`, além de destacar comandos relacionados ao overlay.
+
+Para registrar o layout antes de projetar recuperação automática, execute:
+
+```sh
+python3 identifypanel.py boot-info --boot /CAMINHO/DA/PARTICAO-ROCKNIX
+```
+
 O pacote também aceita os comandos diretos:
 
 ```sh
