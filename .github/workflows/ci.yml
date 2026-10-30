@@ -16,7 +16,7 @@ jobs:
           python-version: "3.11"
       - name: Compile Python and validate Shell syntax
         run: |
-          python -m py_compile identifypanel.py tools/fetch_official_profiles.py tools/select_profile.py
+          python -m py_compile identifypanel.py tools/fetch_official_profiles.py tools/select_profile.py tools/prepare_first_boot.py tools/importpanel.py
           sh -n Selecionar-Tela.sh
       - name: Unit tests
         run: python -m unittest discover -s tests -v
