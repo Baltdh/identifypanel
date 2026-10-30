@@ -8,6 +8,18 @@ O R36H não precisa iniciar um sistema para esta etapa. Antes de inserir o cart�
 
 **Comece por [docs/FIRST_BOOT_PC_PREPARATION.md](docs/FIRST_BOOT_PC_PREPARATION.md).** A nota explica como extrair o DTB original no computador, gerar o DTBO com o importador oficial ROCKNIX e validar o caminho de destino antes do primeiro power-on. Também documenta as diferenças encontradas entre DTBs públicos HL-R36H-V20, HL-R36H-V21 e R36S Panel 4. Não escolha um perfil R36S só pelo número “Panel 4”.
 
+## Primeira inicialização do R36H (preparação no computador)
+
+O R36H está sendo preparado com cartão novo, portanto a correção precisa ser aplicada **antes de colocar o microSD no console**. A referência comunitária específica do R36H identifica o painel como Panel 4 (V5), e o proprietário informou que Panel 4 funcionava no DarkOS. Por isso o pacote inclui um instalador de computador que prepara esse perfil como primeiro candidato na partição ROCKNIX, antes do primeiro boot.
+
+Depois de gravar a imagem ROCKNIX RK3326/R36S no microSD, sem iniciar o console, execute no Windows PowerShell:
+
+    .\\Preparar-Primeiro-Boot-R36H.ps1 -BootDrive E:
+
+Substitua E: pela letra da partição de boot ROCKNIX. O script confere o SHA-256 do DTBO e salva um backup se já houver overlay ativo. Leia [o procedimento completo](docs/R36H_FIRST_BOOT.md).
+
+**Importante:** R36H não é listado oficialmente pelo ROCKNIX. Panel 4 (V5) é o melhor primeiro candidato com as evidências atuais, não uma garantia de compatibilidade. O script não modifica o bootloader, os scripts de boot nem o DTB principal.
+
 ## Pacote offline
 
 O workflow **Build offline IdentifyPanel package** baixa os DTBOs publicados que passam na validação estrutural, salva os hashes e monta o ZIP offline.
