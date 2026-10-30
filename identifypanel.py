@@ -562,11 +562,26 @@ def boot_info(args):
         lower = text.lower()
         print("Referência a mipi-panel.dtbo:", "sim" if "mipi-panel.dtbo" in lower else "não")
         print("Comando/aplicação FDT detectado:", "sim" if any(x in lower for x in ("fdt apply", "fdtoverlays", "fdt addr")) else "não")
+        capabilities = {
+            "load FAT (load mmc)": "load mmc",
+            "leitura FAT explícita (fatload)": "fatload",
+            "gravação FAT (fatwrite)": "fatwrite",
+            "leitura ext4 (ext4load)": "ext4load",
+            "gravação ext4 (ext4write)": "ext4write",
+            "persistência de ambiente U-Boot (saveenv)": "saveenv",
+            "bootcount": "bootcount",
+            "bootlimit": "bootlimit",
+            "altbootcmd": "altbootcmd",
+        }
+        for label, token in capabilities.items():
+            print(f"Capacidade referenciada — {label}:", "sim" if token in lower else "não")
     if not found:
         print("Nenhum boot.ini/boot.cmd/boot.scr/uEnv.txt/extlinux.conf encontrado nos caminhos comuns.")
         print("Isso não prova ausência de bootloader; pode ser um layout diferente ou script binário.")
     print("\nDiagnóstico somente de leitura. Nenhum arquivo foi modificado.")
-    print("A presença de um arquivo não confirma quais comandos U-Boot estão habilitados.")
+    print("A presença de comandos no texto não confirma que o U-Boot instalado os tenha habilitados.")
+    print("Para recuperação pré-kernel, é necessário comprovar leitura e gravação de estado no bootloader;") 
+    print("sem isso, o IdentifyPanel não deve alterar boot.ini/boot.scr automaticamente.")
 
 
 def device_info(args):
