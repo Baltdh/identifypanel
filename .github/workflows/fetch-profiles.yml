@@ -80,6 +80,8 @@ jobs:
           cp tools/select_profile.py IdentifyPanel-Offline/tools/
           cp tools/prepare_first_boot.py IdentifyPanel-Offline/tools/
           cp tools/importpanel.py IdentifyPanel-Offline/tools/
+          python -m pip install --disable-pip-version-check --no-compile --target IdentifyPanel-Offline/tools/vendor "fdt==0.3.3"
+          PYTHONPATH="IdentifyPanel-Offline/tools/vendor" python -c "import fdt; print('PyFDT offline dependency OK')"
           cp -r profiles/official IdentifyPanel-Offline/profiles/
           chmod +x IdentifyPanel-Offline/Selecionar-Tela.sh
           cat > IdentifyPanel-Offline/LEIA-ME-OFFLINE.txt <<'EOF'
@@ -91,12 +93,12 @@ jobs:
           2. Extraia da instalação antiga o DTB Linux efetivamente usado pela tela.
           3. Grave a imagem ROCKNIX RK3326 em um cartão de teste, mas não ligue o console.
           4. No PC, monte a partição de boot e verifique extlinux/extlinux.conf.
-          5. Instale Python 3 e a dependência do importador no PC:
-             python -m pip install fdt
+          5. O pacote já inclui PyFDT em tools/vendor. Basta ter Python 3 instalado no PC.
           6. Se extlinux.conf declarar um único FDT explícito:
              python tools/prepare_first_boot.py --stock-dtb CAMINHO_DO_DTB_DARKOS --boot CAMINHO_DA_PARTICAO_BOOT --install
              Caso contrário, informe --base-dtb CAMINHO_RELATIVO_DO_DTB_BASE que o U-Boot realmente selecionará.
-          7. O programa gera o overlay com o importador ROCKNIX, verifica o alvo no DTB base,
+          7. O programa usa a dependência PyFDT que acompanha o pacote, gera o overlay
+             com o importador ROCKNIX e verifica o alvo no DTB base,
              guarda backup do overlay anterior e instala overlays/mipi-panel.dtbo.
           8. Ejete o cartão com segurança. Só então faça o primeiro boot.
           NÃO escolha o DTB base pelo nome do console; confirme a seleção do boot script.
