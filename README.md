@@ -78,7 +78,7 @@ Por isso, **pressionar Reset sozinho não faz rollback automático nesta versão
 ## Desenvolvimento e testes
 
 ```sh
-python -m py_compile identifypanel.py tools/fetch_official_profiles.py tools/select_profile.py
+python -m py_compile identifypanel.py tools/fetch_official_profiles.py tools/select_profile.py tools/prepare_first_boot.py tools/importpanel.py
 sh -n Selecionar-Tela.sh
 python -m unittest discover -s tests -v
 ```
