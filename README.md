@@ -78,3 +78,7 @@ python -m unittest discover -s tests -v
 ```
 
 Referências: [documentação ROCKNIX para R35S/R36S](https://rocknix.org/devices/unbranded/game-console-r35s-r36s/) e [release de perfis de painel](https://github.com/stolen/rnix/releases/tag/panel_overlays).
+
+## Recuperação pré-kernel (pesquisa técnica)
+
+A arquitetura e os requisitos para um rollback real pelo U-Boot estão documentados em [docs/ROCKNIX_PREBOOT_RECOVERY.md](docs/ROCKNIX_PREBOOT_RECOVERY.md). A nota corrige uma distinção importante: `bootcount`/`altbootcmd` não restaura automaticamente um arquivo da partição; `fdt apply` só altera o device tree em memória. A recuperação persistente exigiria comprovar no R36H o comando de escrita FAT, a numeração MMC, a persistência do ambiente e o caminho de boot. Até obter esses dados, o IdentifyPanel mantém o modo manual e não modifica scripts de boot.
