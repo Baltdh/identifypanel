@@ -1,7 +1,7 @@
 name: IdentifyPanel checks
 on:
   push:
-    branches: [main, autopanel-core]
+    branches: [main, autopanel-core, preboot-selector]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -18,6 +18,10 @@ jobs:
         run: |
           python -m py_compile identifypanel.py tools/fetch_official_profiles.py tools/select_profile.py tools/prepare_first_boot.py tools/importpanel.py
           sh -n Selecionar-Tela.sh
+      - name: Install U-Boot image tools
+        run: sudo apt-get update && sudo apt-get install -y u-boot-tools
+      - name: Compile pre-boot script image
+        run: mkimage -A arm64 -T script -C none -n "IdentifyPanel R36H pre-boot" -d preboot/PanelSelector-Wrapper.ini /tmp/PanelSelector.scr
       - name: Unit tests
         run: python -m unittest discover -s tests -v
       - name: CLI smoke test
