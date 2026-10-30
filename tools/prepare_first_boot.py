@@ -248,9 +248,14 @@ def main() -> int:
             )
 
         fdt_values = active_extlinux_value(extlinux_text, "FDT")
+        if len(fdt_values) > 1:
+            raise PreparationError(
+                "extlinux.conf contém várias diretivas FDT. O script não identifica "
+                "qual entrada será selecionada pelo U-Boot; não vou escolher a primeira."
+            )
         if args.base_dtb:
             base = safe_path(boot, args.base_dtb, "DTB base")
-            if fdt_values:
+            if len(fdt_values) == 1:
                 fdt_declared = fdt_values[0].split()[0]
                 declared_path = safe_path(boot, fdt_declared.lstrip("/"), "DTB indicado por FDT")
                 if declared_path != base:
@@ -340,10 +345,13 @@ def main() -> int:
             dest_rel = Path("overlays/mipi-panel.dtbo")
             dest = boot / dest_rel
             overlay_dir = boot / "overlays"
+            manifest_path = boot / MANIFEST_NAME
             if overlay_dir.is_symlink():
                 raise PreparationError("A pasta overlays é link simbólico.")
             if dest.is_symlink() or (dest.exists() and not dest.is_file()):
                 raise PreparationError("O destino mipi-panel.dtbo é inseguro.")
+            if manifest_path.is_symlink() or (manifest_path.exists() and not manifest_path.is_file()):
+                raise PreparationError(f"{MANIFEST_NAME} é inseguro.")
             manifest = {
                 "format": 1,
                 "created_utc": datetime.now(timezone.utc).isoformat(),
@@ -388,23 +396,40 @@ def main() -> int:
 
             overlay_dir.mkdir(parents=True, exist_ok=True)
             backup = backup_existing(dest)
-            atomic_write(dest, overlay_data)
-            if sha256_file(dest) != manifest["overlay"]["sha256"]:
-                raise PreparationError(
-                    "A verificação pós-gravação falhou. O overlay instalado não corresponde ao gerado."
+            manifest_backup = backup_existing(manifest_path)
+            try:
+                atomic_write(dest, overlay_data)
+                if sha256_file(dest) != manifest["overlay"]["sha256"]:
+                    raise PreparationError(
+                        "A verificação pós-gravação falhou. O overlay instalado não corresponde ao gerado."
+                    )
+                manifest["install_state"] = "installed"
+                manifest["backup"] = (
+                    str(backup.relative_to(boot)).replace("\\", "/") if backup else None
                 )
-            manifest["install_state"] = "installed"
-            manifest["backup"] = (
-                str(backup.relative_to(boot)).replace("\\", "/") if backup else None
-            )
-            manifest_path = boot / MANIFEST_NAME
-            if manifest_path.is_symlink():
-                raise PreparationError(f"{MANIFEST_NAME} é link simbólico.")
-            manifest_payload = (json.dumps(manifest, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
-            atomic_write(manifest_path, manifest_payload)
+                manifest["manifest_backup"] = (
+                    str(manifest_backup.relative_to(boot)).replace("\\", "/")
+                    if manifest_backup else None
+                )
+                manifest_payload = (json.dumps(manifest, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
+                atomic_write(manifest_path, manifest_payload)
+            except Exception:
+                # Keep the boot partition in its previous state if metadata or
+                # post-write verification fails after staging the overlay.
+                if backup:
+                    atomic_write(dest, backup.read_bytes())
+                else:
+                    dest.unlink(missing_ok=True)
+                if manifest_backup:
+                    atomic_write(manifest_path, manifest_backup.read_bytes())
+                else:
+                    manifest_path.unlink(missing_ok=True)
+                raise
             print("\nOverlay instalado e SHA-256 conferido.")
             if backup:
                 print(f"Overlay anterior preservado em: {backup}")
+            if manifest_backup:
+                print(f"Manifesto anterior preservado em: {manifest_backup}")
             print(f"Manifesto: {manifest_path}")
             print("Ejete o cartão com segurança. Nenhum DTB base ou setor do U-Boot foi modificado.")
             return 0
