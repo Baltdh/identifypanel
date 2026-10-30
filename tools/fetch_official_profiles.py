@@ -24,6 +24,11 @@ def request(url):
         return response.read()
 
 def validate(data):
+    # When executed as tools/fetch_official_profiles.py, Python puts only tools/
+    # at sys.path[0]. Add the repository root so the shared validator is importable.
+    repository_root = str(Path(__file__).resolve().parent.parent)
+    if repository_root not in sys.path:
+        sys.path.insert(0, repository_root)
     # Keep download-time validation identical to the installer/CLI validator.
     from identifypanel import validate_fdt_bytes
     return validate_fdt_bytes(data)
