@@ -6,7 +6,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $ProfileName = 'mipi-panel.dtbo.r36s-panel4'
-$PackageRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path`r`n$PackageRoot = if (Test-Path -LiteralPath (Join-Path $ScriptDir 'profiles\official\manifest.json')) { $ScriptDir } else { Split-Path -Parent $ScriptDir }
 $ProfilePath = Join-Path $PackageRoot ('profiles\official\' + $ProfileName)
 $CatalogPath = Join-Path $PackageRoot 'profiles\official\manifest.json'
 
@@ -162,6 +162,8 @@ try {
         catch {
             if ($backup -and (Test-Path -LiteralPath $backup -PathType Leaf)) {
                 Copy-Item -LiteralPath $backup -Destination $target -Force
+            } elseif (Test-Path -LiteralPath $target -PathType Leaf) {
+                Remove-Item -LiteralPath $target -Force
             }
             throw
         }
