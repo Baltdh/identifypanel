@@ -2,6 +2,12 @@
 
 Ferramenta offline para inspecionar e testar overlays LCD no ROCKNIX, com foco experimental no R36H.
 
+## Primeira inicialização do R36H (preparação no PC)
+
+O R36H não precisa iniciar um sistema para esta etapa. Antes de inserir o cartão no console, prepare o overlay na partição de boot usando o DTB Linux da instalação DarkOS que funcionava. O ROCKNIX carrega `overlays/mipi-panel.dtbo` antes do kernel quando o seu `extlinux.conf` contém `FDTOVERLAYS /overlays/mipi-panel.dtbo`.
+
+**Comece por [docs/FIRST_BOOT_PC_PREPARATION.md](docs/FIRST_BOOT_PC_PREPARATION.md).** A nota explica como extrair o DTB original no computador, gerar o DTBO com o importador oficial ROCKNIX e validar o caminho de destino antes do primeiro power-on. Também documenta as diferenças encontradas entre DTBs públicos HL-R36H-V20, HL-R36H-V21 e R36S Panel 4. Não escolha um perfil R36S só pelo número “Panel 4”.
+
 ## Pacote offline
 
 O workflow **Build offline IdentifyPanel package** baixa os DTBOs publicados que passam na validação estrutural, salva os hashes e monta o ZIP offline.
@@ -14,9 +20,9 @@ O workflow **Build offline IdentifyPanel package** baixa os DTBOs publicados que
 
 A validação estrutural confirma apenas que o arquivo tem uma estrutura FDT plausível. Ela não comprova compatibilidade elétrica ou de temporização com o R36H.
 
-## Fluxo de teste sugerido
+## Fluxo de teste pós-boot
 
-**Preserve o cartão DarkOS que funciona.** Use um cartão ROCKNIX de teste e guarde uma cópia da pasta `stock` e do overlay original antes de começar.
+Este seletor é uma alternativa para testes em que o ROCKNIX já inicia. **Preserve o cartão DarkOS que funciona.** Use um cartão ROCKNIX de teste e guarde uma cópia da pasta `stock` e do overlay original antes de começar.
 
 No ROCKNIX, abra um terminal na pasta extraída:
 
@@ -67,7 +73,7 @@ Por isso, **pressionar Reset sozinho não faz rollback automático nesta versão
 - Recusa manifesto inválido e alguns caminhos de link simbólico que podem desviar as gravações.
 - Não altera o DTB principal.
 - Não reinicia nem confirma automaticamente um perfil.
-- Os perfis publicados `r36s-panel*` e os demais candidatos não estão certificados para R36H. O nome “Panel 4” no DarkOS não prova que `r36s-panel4` seja o mesmo painel no ROCKNIX.
+- Os perfis publicados `r36s-panel*` e os demais candidatos não estão certificados para R36H.
 
 ## Desenvolvimento e testes
 
@@ -81,4 +87,4 @@ Referências: [documentação ROCKNIX para R35S/R36S](https://rocknix.org/device
 
 ## Recuperação pré-kernel (pesquisa técnica)
 
-A arquitetura e os requisitos para um rollback real pelo U-Boot estão documentados em [docs/ROCKNIX_PREBOOT_RECOVERY.md](docs/ROCKNIX_PREBOOT_RECOVERY.md). A nota corrige uma distinção importante: `bootcount`/`altbootcmd` não restaura automaticamente um arquivo da partição; `fdt apply` só altera o device tree em memória. A recuperação persistente exigiria comprovar no R36H o comando de escrita FAT, a numeração MMC, a persistência do ambiente e o caminho de boot. Até obter esses dados, o IdentifyPanel mantém o modo manual e não modifica scripts de boot.
+A arquitetura e os requisitos para um rollback real pelo U-Boot estão documentados em [docs/ROCKNIX_PREBOOT_RECOVERY.md](docs/ROCKNIX_PREBOOT_RECOVERY.md). `bootcount`/`altbootcmd` não restaura automaticamente um arquivo da partição; `fdt apply` só altera o device tree em memória. A recuperação persistente exigiria comprovar a escrita FAT, a numeração MMC, a persistência do ambiente e o caminho de boot da imagem específica. Até obter esses dados, o IdentifyPanel mantém o modo manual e não modifica scripts de boot.
