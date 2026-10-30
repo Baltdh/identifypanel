@@ -2,7 +2,7 @@ name: Build offline IdentifyPanel package
 on:
   workflow_dispatch:
   push:
-    branches: [autopanel-core]
+    branches: [autopanel-core, preboot-selector]
     paths:
       - ".github/workflows/fetch-profiles.yml"
       - "identifypanel.py"
@@ -11,6 +11,7 @@ on:
       - "tools/**"
       - "tests/**"
       - "docs/**"
+      - "preboot/**"
   schedule:
     - cron: "17 8 1 * *"
 permissions:
@@ -25,6 +26,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Install U-Boot image tools
+        run: sudo apt-get update && sudo apt-get install -y u-boot-tools
+      - name: Compile pre-boot selector for legacy RK3326 U-Boot
+        run: mkimage -A arm64 -T script -C none -n "IdentifyPanel R36H pre-boot" -d preboot/PanelSelector-Wrapper.ini preboot/PanelSelector.scr
       - name: Download and validate every published official DTBO
         run: python tools/fetch_official_profiles.py --output profiles/official
       - name: Verify manifest, hashes, FDT files, and shell syntax
@@ -73,18 +78,21 @@ jobs:
           fi
       - name: Assemble complete offline folder
         run: |
-          mkdir -p IdentifyPanel-Offline/tools IdentifyPanel-Offline/profiles IdentifyPanel-Offline/docs
+          mkdir -p IdentifyPanel-Offline/tools IdentifyPanel-Offline/profiles IdentifyPanel-Offline/docs IdentifyPanel-Offline/preboot
           cp identifypanel.py IdentifyPanel-Offline/
           cp README.md IdentifyPanel-Offline/
           cp Selecionar-Tela.sh IdentifyPanel-Offline/
           cp tools/select_profile.py IdentifyPanel-Offline/tools/
           cp docs/FIRST_BOOT_PC_PREPARATION.md IdentifyPanel-Offline/docs/
+          cp docs/PREBOOT_SELECTOR.md IdentifyPanel-Offline/docs/
+          cp -r preboot/. IdentifyPanel-Offline/preboot/
           cp tools/prepare_first_boot.py IdentifyPanel-Offline/tools/
           cp tools/importpanel.py IdentifyPanel-Offline/tools/
           python -m pip install --disable-pip-version-check --no-compile --target IdentifyPanel-Offline/tools/vendor "fdt==0.3.3"
           PYTHONPATH="IdentifyPanel-Offline/tools/vendor" python -c "import fdt; print('PyFDT offline dependency OK')"
           cp -r profiles/official IdentifyPanel-Offline/profiles/
           chmod +x IdentifyPanel-Offline/Selecionar-Tela.sh
+          test -s IdentifyPanel-Offline/preboot/PanelSelector.scr
           cat > IdentifyPanel-Offline/LEIA-ME-OFFLINE.txt <<'EOF'
           IDENTIFYPANEL — PRIMEIRO BOOT NO R36H E MENU OFFLINE
           
@@ -124,6 +132,20 @@ jobs:
           
           Os DTBOs de profiles/official são candidatos estruturais, não certificados para R36H.
           Preserve o cartão original. Não grave DTB base, boot.scr ou setores raw do U-Boot.
+
+          PARTE C — MENU ANTES DO ROCKNIX (SOMENTE U-BOOT LEGADO VARIANTE A)
+          Leia docs/PREBOOT_SELECTOR.md inteiro. Confirme que update.log mostra "Using legacy u-boot"
+          ou confirme independentemente que o cartão usa a_uboot.bin. Nunca instale na variante B.
+          extlinux.conf precisa ter FDT explícito para um DTB base existente e
+          FDTOVERLAYS /overlays/mipi-panel.dtbo.
+          Gere um overlay R36H próprio com o preparador no PC; não renomeie DTB bruto.
+          Execute no PowerShell:
+            .\preboot\Install-PanelSelector.ps1 -BootRoot "E:" -R36HOriginalOverlay "C:\R36H\r36h-original.dtbo"
+          Segure R1 ao ligar para abrir o menu. O mapa de GPIO vem de referência R36S
+          e ainda não foi confirmado para toda revisão R36H. A tela exige LCD funcional no U-Boot.
+          Para remover:
+            .\preboot\Restore-Original-Boot.ps1 -BootRoot "E:"
+          O instalador preserva o boot.scr anterior como boot0.scr e nunca grava o U-Boot raw.
           EOF
           cp profiles/official/manifest.json IdentifyPanel-Offline/
           cd IdentifyPanel-Offline
