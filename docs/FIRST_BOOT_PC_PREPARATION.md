@@ -1,106 +1,175 @@
-# Primeira inicialização do R36H: preparação inteiramente no PC
+# Primeira inicialização do R36H: preparação do cartão no PC
 
-## Objetivo
+## Objetivo e limite
 
-Preparar o cartão ROCKNIX antes de inserir o microSD no R36H. Nenhum comando, menu, Python ou serviço precisa executar no console. O painel deve estar configurado no arquivo de overlay que o U-Boot carrega antes do kernel.
+Preparar o cartão ROCKNIX antes de inserir o microSD no R36H. Nenhum comando, menu, Python ou serviço precisa executar no console. O kernel deve receber o DTB correto e o overlay de painel já aplicado pelo U-Boot durante a primeira inicialização.
 
-Esta estratégia resolve a configuração estática do painel para o primeiro boot. Ela não é o mesmo que implementar troca automática de perfis ou rollback pré-kernel.
+Isto configura um **primeiro boot com um DTB base fixado e um overlay derivado do firmware original**. Não implementa tentativas automáticas de vários painéis nem rollback pré-kernel. Não é seguro substituir o bootloader/U-Boot para tentar criar esse mecanismo sem conhecer a revisão exata da placa e a imagem gravada.
 
-## Fatos confirmados no código do ROCKNIX
+## O que o código upstream do ROCKNIX confirma
 
-Repositório: https://github.com/ROCKNIX/distribution, branch `next`.
+Repositório: https://github.com/ROCKNIX/distribution, branch \`next\`.
 
-- O arquivo RK3326 `projects/ROCKNIX/devices/RK3326/packages/u-boot/config/extlinux/extlinux.conf` declara `FDTOVERLAYS /overlays/mipi-panel.dtbo`.
-- O README de `config/overlays` diz que o arquivo esperado para display é `mipi-panel.dtbo`.
-- O utilitário upstream `projects/ROCKNIX/packages/linux-drivers/generic-dsi/scripts/importpanel.py` foi projetado para extrair os parâmetros de painel de um DTB de firmware original e gerar um overlay para o driver `rocknix,generic-dsi`.
-- O importador procura o painel em `/dsi@ff450000/panel@0` ou `/dsi@fe060000/panel@0`; ele extrai formato, lanes, flags DSI, timings e sequência de inicialização.
-- A imagem RK3326 contém variantes de U-Boot/boot script. Os arquivos `a_boot.ini` e `b_boot.ini` não devem ser substituídos por suposição. O pacote `u-boot` compila scripts e possui um processo de atualização que também escreve o binário do U-Boot em setores do disco.
+- O RK3326 usa \`extlinux/extlinux.conf\`; o arquivo upstream declara \`FDTDIR /\` e \`FDTOVERLAYS /overlays/mipi-panel.dtbo\`. A linha \`FDT\` de exemplo está comentada.
+- O README upstream de \`config/extlinux\` explica que o U-Boot normalmente executa \`boot.scr\`, verifica hardware por ADC/GPIO, escolhe um DTB e passa a seleção para extlinux. Também diz que, em dispositivo raro ou com detecção incorreta, a diretiva \`FDT\` em \`extlinux.conf\` é a palavra final e permite escolher manualmente o DTB.
+- O README de \`config/overlays\` informa que o único nome esperado para o overlay de display é \`mipi-panel.dtbo\`.
+- O script upstream \`importpanel.py\` gera um overlay para \`rocknix,generic-dsi\) a partir do DTB de firmware original. Ele extrai formato DSI, lanes, flags, timings e sequência de inicialização.
+- O importador procura o nó \`/dsi@ff450000/panel@0\` ou \`/dsi@fe060000/panel@0\`.
+- Os boot scripts \`a_boot.ini\` e \`b_boot.ini\` têm tabelas de detecção distintas. O R36H não tem uma entrada oficialmente identificada nesses scripts. Não é correto pressupor que a detecção automática escolherá o DTB de R36S para o R36H.
 
-Links diretos:
-- https://github.com/ROCKNIX/distribution/blob/next/projects/ROCKNIX/devices/RK3326/packages/u-boot/config/extlinux/extlinux.conf
-- https://github.com/ROCKNIX/distribution/blob/next/projects/ROCKNIX/devices/RK3326/packages/u-boot/config/overlays/README.txt
-- https://github.com/ROCKNIX/distribution/blob/next/projects/ROCKNIX/packages/linux-drivers/generic-dsi/scripts/importpanel.py
-- https://github.com/ROCKNIX/distribution/blob/next/projects/ROCKNIX/devices/RK3326/packages/u-boot/config/a_boot.ini
-- https://github.com/ROCKNIX/distribution/blob/next/projects/ROCKNIX/devices/RK3326/packages/u-boot/config/b_boot.ini
+Fontes:
+- extlinux: https://github.com/ROCKNIX/distribution/blob/next/projects/ROCKNIX/devices/RK3326/packages/u-boot/config/extlinux/extlinux.conf
+- explicação sobre seleção de DTB e diretiva FDT: https://github.com/ROCKNIX/distribution/blob/next/projects/ROCKNIX/devices/RK3326/packages/u-boot/config/extlinux/README.txt
+- overlays: https://github.com/ROCKNIX/distribution/blob/next/projects/ROCKNIX/devices/RK3326/packages/u-boot/config/overlays/README.txt
+- importpanel.py: https://github.com/ROCKNIX/distribution/blob/next/projects/ROCKNIX/packages/linux-drivers/generic-dsi/scripts/importpanel.py
+- boot scripts: https://github.com/ROCKNIX/distribution/tree/next/projects/ROCKNIX/devices/RK3326/packages/u-boot/config
 
-## Evidência específica dos DTBs comunitários R36H
+## Identificação do painel R36H
 
-O repositório comunitário https://github.com/southoz/dArkOSRE-R36 mantém DTBs separados para as placas `HL-R36H-V20 2024-05-18` e `HL-R36H-V21 2024-11-18`. A tabela de instalação trata as duas como variante `r36s`, mas são arquivos DTB diferentes. A própria documentação de instalação identifica essas placas pelo ID da motherboard e mantém o perfil R36S Panel 4 como outra entrada.
+O R36H não aparece na lista oficial de dispositivos ROCKNIX. A página comunitária Handhelds Wiki recomenda usar a imagem R36S e instalar o DTBO do painel. Ela identifica o R36H como variante horizontal do R36S com Panel 4 (V5). Isso é uma referência comunitária, não certificação oficial do ROCKNIX:
+https://handhelds.wiki/R36H
 
-Foram inspecionados os blobs públicos do repositório, sem gravá-los no console:
+Há também um dump comunitário separado para R36H:
+https://github.com/mstrblueskys/R36H
 
-| Arquivo | SHA-1 Git blob | Painel em `/dsi@ff450000/panel@0` | Dados principais |
-|---|---|---|---|
-| HL-R36H-V20 2024-05-18 | `e249a4841371725df6cbb6d5a11a21d24d4b9d39` | `elida,kd35t133` | 640×480, 4 lanes, sequência de init de 773 bytes, clock 29 MHz; 60 Hz usa V-front-porch 165 |
-| HL-R36H-V21 2024-11-18 | `cd5eae473af8220563dba7605baa9527faed18a1` | `elida,kd35t133` | 640×480, 4 lanes, sequência de init de 763 bytes, clock 58 MHz; H porches 300/200/300 |
-| R36S-V12 Panel 4 | `1b62e80c93a95e673cb2409698c59e668e13e17e` | `elida,kd35t133` | 640×480, 4 lanes, sequência de init de 773 bytes, clock 29 MHz; 60 Hz usa V-front-porch 16 |
+Nesse repositório, \`overlays.zip\` contém \`overlays/mipi-panel.dtbo\). O arquivo tem SHA-256 \`846ee139c96f0c121116234c63025b97cf3f4f947147e6761185ab965f4b77f3\`, exatamente igual ao DTBO público \`mipi-panel.dtbo.r36s-panel4\). O \`boot.ini\` do dump carrega \`rk3326-rg351mp-linux.dtb\); a análise desse DTB encontrou 640×480, 4 lanes, init sequence de 773 bytes e clock de 29 MHz, com o timing de 60 Hz correspondente ao R36S Panel 4. Isso confirma que **ao menos um dump comunitário de R36H** usa esse DTBO/timing.
 
-Interpretação importante:
+Não generalizar esse resultado para todas as revisões: o próprio dump alerta que há revisões silenciosas. E outro repositório comunitário lista placas HL-R36H-V20 e HL-R36H-V21 com DTBs separados e parâmetros diferentes.
 
-- V20 e R36S Panel 4 têm descritor de painel e dimensões semelhantes, mas não são idênticos: o timing vertical de 60 Hz difere.
-- V21 tem timings e sequência de inicialização significativamente diferentes.
-- Isso explica por que selecionar um arquivo apenas pelo rótulo “Panel 4” pode ser incorreto para uma placa R36H. A revisão da motherboard e o DTB original são mais confiáveis que o nome comercial do painel.
-- Estes arquivos comunitários não substituem o DTB original do console e não certificam qualquer revisão não identificada.
+### Diferenças reais encontradas em DTBs comunitários
 
-Fonte da tabela de placas: https://github.com/southoz/dArkOSRE-R36/blob/main/files/BOOT/dtb/r36_devices.ini
-Fonte da instalação e seleção por motherboard: https://github.com/southoz/dArkOSRE-R36/wiki/Firmware-Installation
-Arquivos DTB:
-- https://github.com/southoz/dArkOSRE-R36/tree/main/files/BOOT/dtb/r36s/HL-R36H-V20%202024-05-18
-- https://github.com/southoz/dArkOSRE-R36/tree/main/files/BOOT/dtb/r36s/HL-R36H-V21%202024-11-18
-- https://github.com/southoz/dArkOSRE-R36/tree/main/files/BOOT/dtb/r36s/R36S-V12%202023-08-18%20Panel%204
+| DTB comunitário | Init sequence | Clock | Timing de 60 Hz |
+|---|---:|---:|---|
+| HL-R36H-V20 2024-05-18 | 773 bytes | 29 MHz | V-front-porch 165 |
+| HL-R36H-V21 2024-11-18 | 763 bytes | 58 MHz | H porches 300/200/300 |
+| R36S-V12 Panel 4 | 773 bytes | 29 MHz | V-front-porch 16 |
 
-## Procedimento recomendado para o primeiro boot
+Arquivos e documentação:
+- tabela de revisões: https://github.com/southoz/dArkOSRE-R36/blob/main/files/BOOT/dtb/r36_devices.ini
+- instalação e seleção por placa: https://github.com/southoz/dArkOSRE-R36/wiki/Firmware-Installation
+- DTBs HL-R36H-V20/V21 e R36S Panel 4: https://github.com/southoz/dArkOSRE-R36/tree/main/files/BOOT/dtb/r36s
 
-### Entrada preferida: DTB original do DarkOS que funcionava
+**Conclusão prática:** o histórico de que Panel 4 funcionava no DarkOS é uma evidência útil, mas o melhor arquivo-fonte é o DTB Linux efetivamente utilizado pelo DarkOS que funcionava no seu aparelho. Não escolha o DTBO pelo nome do painel se puder importar os parâmetros originais.
 
-A informação de que Panel 4 funcionava no DarkOS é útil. O melhor artefato para preservar esse comportamento é o DTB original usado por aquela instalação, não um overlay R36S baixado por nome.
+## Procedimento recomendado
 
-1. No PC, preserve o backup completo do cartão/instalação antiga do DarkOS.
-2. Extraia do backup a partição BOOT e localize o DTB Linux efetivamente usado, normalmente chamado `rk3326-r36s-linux.dtb` em firmwares desta família. Não confundir com `rg351mp-uboot.dtb`, usado por alguns bootloaders para display inicial.
-3. Grave a imagem ROCKNIX RK3326 em um cartão de teste, mas ainda não o coloque no console.
-4. No PC, abra a partição de boot da nova imagem e inspecione `extlinux/extlinux.conf`, o DTB selecionado (se indicado por `FDT`) e os arquivos de boot. Não altere o DTB base nem o U-Boot.
-5. Gere e instale o overlay no PC com a ferramenta incluída no ZIP IdentifyPanel. O pacote offline já inclui PyFDT (`fdt==0.3.3`) em `tools/vendor`; basta ter Python 3 no computador. Não é necessário instalar dependências nem ter internet. Para um checkout do código-fonte fora do ZIP, instale `fdt` com `python -m pip install fdt==0.3.3`.
+### 1. Preservar e extrair o DTB original do DarkOS
 
-Faça uma prévia (não grava nada):
-```sh
-python tools/prepare_first_boot.py --stock-dtb /caminho/para/rk3326-r36s-linux.dtb --boot /caminho/da/particao-BOOT
-```
+1. Mantenha o backup completo do cartão DarkOS.
+2. Abra a partição BOOT desse backup no computador.
+3. Leia o \`boot.ini\`, \`extlinux.conf\` ou instrução de boot usada pelo DarkOS para identificar **qual DTB Linux é realmente carregado**.
+4. Copie esse DTB para uma pasta no PC. Não confunda um DTB de splash/logo do U-Boot com o DTB entregue ao kernel Linux.
+5. Se o backup for uma imagem de cartão, monte a partição BOOT da imagem em modo somente leitura. Não modifique o backup.
 
-Se `extlinux.conf` tiver uma diretiva `FDT /arquivo.dtb` ativa, a ferramenta consegue inferir o DTB base. Se não tiver um `FDT` único e explícito, informe `--base-dtb` com o arquivo que o boot script/U-Boot realmente carrega. Não escolha esse arquivo só pelo nome do console.
+Não presuma que o arquivo se chama \`rk3326-r36s-linux.dtb\`: no dump comunitário citado acima, por exemplo, o \`boot.ini\` carrega \`rk3326-rg351mp-linux.dtb\`. O arquivo certo é o que a configuração daquele DarkOS efetivamente usa.
 
-Depois de conferir a prévia, repita com `--install`:
-```sh
-python tools/prepare_first_boot.py --stock-dtb /caminho/para/rk3326-r36s-linux.dtb --boot /caminho/da/particao-BOOT --base-dtb rk3326-gameconsole-r36s.dtb --install
-```
+### 2. Gravar a imagem ROCKNIX e identificar a partição de boot
 
-O exemplo de `--base-dtb` é apenas ilustrativo; use o DTB comprovadamente selecionado na imagem gravada. O script verifica a diretiva `FDTOVERLAYS`, gera o arquivo com `tools/importpanel.py`, confirma que `target-path` existe no DTB base, faz backup de um overlay anterior e instala em `overlays/mipi-panel.dtbo`. Sem `--install`, nenhum arquivo é modificado.
+1. Grave a imagem ROCKNIX \`RK3326\` destinada a R36S em um microSD de teste. A gravação apaga o cartão.
+2. Ainda não coloque o cartão no R36H.
+3. Monte no computador a partição identificada como \`ROCKNIX\`.
+4. Confirme que existem \`extlinux/extlinux.conf\` e o DTB base do sistema. Na imagem RK3326/R36S, o DTB de dispositivo previsto pelo código-fonte é \`rk3326-gameconsole-r36s.dtb\).
+5. Não use a partição de jogos/ROMs como \`--boot\`.
 
-6. Antes de instalar o resultado, confirme que o DTB base que o novo ROCKNIX realmente selecionará contém o nó alvo apontado pelo overlay (`/dsi@ff450000/panel@0` ou `/dsi@fe060000/panel@0`). Se a configuração de boot não deixar claro qual DTB será carregado, pare e resolva essa seleção no PC; não escolha um DTB aleatório.
-7. Faça backup de qualquer `overlays/mipi-panel.dtbo` existente na partição de boot.
-8. Copie o DTBO gerado para o caminho exato `overlays/mipi-panel.dtbo`. O `extlinux.conf` oficial aponta para esse nome e caminho.
-9. Ejete o cartão com segurança. Só então faça o primeiro boot.
-### Se o DTB original do DarkOS não estiver disponível
+Se a imagem concreta não tiver \`extlinux/extlinux.conf\` ou não tiver o arquivo \`rk3326-gameconsole-r36s.dtb\`, pare: não aplique este procedimento sem inspecionar a estrutura real da imagem.
 
-Use a revisão real da motherboard para escolher o DTB comunitário específico HL-R36H-V20 ou HL-R36H-V21 como fonte de importação, depois gere o overlay com o importador ROCKNIX. Não use o perfil R36S Panel 4 como substituto automático. As duas revisões R36H listadas não compartilham os mesmos timings.
+### 3. Gerar uma prévia do overlay no PC
 
-## Verificações obrigatórias antes de ejetar o cartão
+O pacote IdentifyPanel inclui:
+- \`tools/prepare_first_boot.py\`
+- \`tools/importpanel.py\`, importador ROCKNIX
+- dependência PyFDT vendorizada em \`tools/vendor\`
 
-- [ ] `extlinux/extlinux.conf` da imagem aponta para `/overlays/mipi-panel.dtbo`.
-- [ ] O arquivo gerado é um FDT/DTBO válido.
-- [ ] O overlay aponta para o caminho de painel que existe no DTB base selecionado.
-- [ ] O arquivo está no caminho `overlays/mipi-panel.dtbo`, não apenas ao lado do `extlinux.conf`.
-- [ ] Foi guardada uma cópia do overlay que já existia.
-- [ ] Não foram modificados `boot.scr`, `boot.ini`, o DTB base, a tabela de partições ou os setores raw do U-Boot.
+Requer Python 3 no computador. Não requer Python, internet, Wi-Fi ou terminal no R36H.
 
-## O que não fazer
+No terminal do computador, dentro da pasta \`IdentifyPanel-Offline\`, execute a prévia:
 
-- Não substituir o DTB base por um DTB de outra placa só para tentar acertar a tela.
-- Não gravar `uboot.bin`, `idbloader`, `boot.scr` ou variáveis persistentes do U-Boot sem identificar a imagem e a variante exatas.
-- Não assumir que um menu ou script de pós-boot consegue recuperar uma falha ocorrida antes do kernel.
-- Não transplantar o U-Boot do projeto NixOS/Armbian para ROCKNIX: esse projeto documenta um bootloader Armbian modificado e fluxo próprio de detecção; não é o bootloader ROCKNIX e não certifica R36H.
+\`\`\`sh
+python tools/prepare_first_boot.py --stock-dtb "/caminho/DTB-original-DarkOS.dtb" --boot "/caminho/particao-ROCKNIX" --base-dtb rk3326-gameconsole-r36s.dtb
+\`\`\`
 
-## Limite atual e próxima implementação
+No Windows, use caminhos entre aspas, por exemplo:
 
-A aplicação do overlay em `extlinux.conf` ocorre antes de o kernel iniciar, portanto preparar `mipi-panel.dtbo` no PC é suficiente para corrigir o primeiro boot quando o DTB base e o painel estão corretamente identificados.
+\`\`\`powershell
+python .\tools\prepare_first_boot.py --stock-dtb "D:\DarkOS\BOOT\DTB-original.dtb" --boot "E:\" --base-dtb rk3326-gameconsole-r36s.dtb
+\`\`\`
 
-Isso não implementa fallback automático entre vários painéis. Um seletor com tentativas automáticas antes do kernel exigiria um boot script/bootloader validado para a imagem exata, com armazenamento durável do índice de tentativa e confirmação escrita por um sistema iniciado. O próximo desenvolvimento deve ser uma ferramenta host-side que valide a imagem/cartão, gere o overlay a partir do DTB original e instale-o com backup — sem exigir inicialização do R36H.
+A prévia não altera arquivos. Ela valida:
+- estrutura FDT do DTB original e do DTB base ROCKNIX;
+- existência do nó de painel no DTB original;
+- propriedades necessárias para importar o painel;
+- \`FDTOVERLAYS /overlays/mipi-panel.dtbo\` no \`extlinux.conf\);
+- existência do caminho-alvo do overlay no DTB base ROCKNIX;
+- compatibilidade do overlay gerado com \`rocknix,generic-dsi\`.
+
+O código também calcula o SHA-256 do overlay produzido.
+
+### 4. Fixar o DTB base para o primeiro boot e instalar
+
+O \`extlinux.conf\` upstream normalmente não tem uma diretiva \`FDT\` ativa. Nesse caso, o U-Boot pode escolher o DTB por ADC/GPIO e a seleção pode não reconhecer o R36H.
+
+Por isso, ao receber \`--base-dtb rk3326-gameconsole-r36s.dtb\), o IdentifyPanel insere uma diretiva explícita:
+
+\`\`\`text
+FDT /rk3326-gameconsole-r36s.dtb
+\`\`\`
+
+Ela é colocada antes de \`FDTOVERLAYS\`. Com isso, o primeiro boot não depende da seleção automática de DTB por ADC/GPIO. A diretiva \`FDT\` é o mecanismo previsto pelo próprio extlinux do ROCKNIX para escolher manualmente o DTB.
+
+Depois de conferir a prévia e confirmar que o arquivo base existe na partição, execute novamente com \`--install\`:
+
+\`\`\`sh
+python tools/prepare_first_boot.py --stock-dtb "/caminho/DTB-original-DarkOS.dtb" --boot "/caminho/particao-ROCKNIX" --base-dtb rk3326-gameconsole-r36s.dtb --install
+\`\`\`
+
+Na instalação, o script:
+- grava o DTBO gerado como \`overlays/mipi-panel.dtbo\`;
+- fixa o DTB base em \`extlinux/extlinux.conf\`, caso a imagem não tenha uma diretiva \`FDT\` ativa;
+- guarda backups do overlay anterior, de \`extlinux.conf\) e do manifesto, quando já existirem;
+- verifica SHA-256 após gravar;
+- restaura os arquivos anteriores se ocorrer falha na gravação ou na verificação;
+- escreve \`IdentifyPanel-firstboot.json\` com as fontes, hashes, destino e backups.
+
+Se \`extlinux.conf\` já tiver uma diretiva \`FDT\` diferente do arquivo informado em \`--base-dtb\`, a ferramenta aborta. Não substitui uma escolha explícita existente sem análise.
+
+### 5. Antes de inserir o cartão no R36H
+
+- [ ] O DTB fonte é o DTB Linux efetivamente usado pelo DarkOS que funcionava.
+- [ ] A imagem é a ROCKNIX RK3326/R36S.
+- [ ] A partição fornecida em \`--boot\` é a partição de boot \`ROCKNIX\`.
+- [ ] Existe \`rk3326-gameconsole-r36s.dtb\` na raiz dessa partição.
+- [ ] O preview confirmou que o overlay aponta para um nó existente no DTB base.
+- [ ] \`extlinux.conf\` contém \`FDT /rk3326-gameconsole-r36s.dtb\` e \`FDTOVERLAYS /overlays/mipi-panel.dtbo\`.
+- [ ] Existe um backup do overlay e de \`extlinux.conf\`, se já havia versões anteriores.
+
+Ejete o microSD com segurança. Só então coloque-o no slot do sistema do R36H e faça o primeiro boot.
+
+## O que o procedimento altera e o que preserva
+
+Pode criar ou alterar somente:
+- \`overlays/mipi-panel.dtbo\`;
+- uma diretiva \`FDT /...\` em \`extlinux/extlinux.conf\), se não houver uma ativa;
+- \`IdentifyPanel-firstboot.json\) e arquivos de backup.
+
+Não altera:
+- DTB base ROCKNIX;
+- \`boot.ini\), \`boot.scr\) ou outros scripts de U-Boot;
+- SPL, U-Boot, BootROM, variáveis de ambiente ou setores raw do cartão;
+- tabela de partições;
+- partição de sistema/jogos.
+
+## Limitações
+
+- R36H ainda não é oficialmente listado pelo ROCKNIX. Usar a imagem R36S e o DTB de dispositivo R36S é uma adaptação comunitária, não certificação oficial.
+- O teste de estrutura, SHA-256 e caminho do nó prova integridade e compatibilidade estrutural básica; não prova funcionamento elétrico, reset GPIO, temporização real nem visibilidade do LCD.
+- Fixar \`rk3326-gameconsole-r36s.dtb\` evita que o U-Boot escolha um DTB arbitrário, mas também fixa o restante da configuração da placa R36S. A comunidade relata que a imagem R36S funciona no R36H; ainda assim, se o seu R36H tiver uma revisão de placa muito diferente, a primeira inicialização pode exigir um DTB de placa específico.
+- O processo não testa pixels nem executa fallback automático. Ele prepara uma configuração inicial fundamentada em DTB de origem e overlay. O cartão original do DarkOS deve continuar preservado.
+- Se não for possível obter o DTB original do seu DarkOS, a alternativa é identificar fisicamente a revisão da motherboard e importar o DTB comunitário HL-R36H-V20 ou HL-R36H-V21 correspondente. Não assuma que os dois são intercambiáveis.
+
+## Referências
+
+- ROCKNIX R35S/R36S — procedimento de DTBO e importpanel: https://rocknix.org/devices/unbranded/game-console-r35s-r36s/
+- ROCKNIX install: https://rocknix.org/play/install/
+- Handhelds Wiki — R36H: https://handhelds.wiki/R36H
+- Dump comunitário R36H e overlays: https://github.com/mstrblueskys/R36H
+- Revisões comunitárias R36H e DTBs: https://github.com/southoz/dArkOSRE-R36
