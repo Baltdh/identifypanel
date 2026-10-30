@@ -78,6 +78,8 @@ jobs:
           cp README.md IdentifyPanel-Offline/
           cp Selecionar-Tela.sh IdentifyPanel-Offline/
           cp tools/select_profile.py IdentifyPanel-Offline/tools/
+          cp tools/Preparar-Primeiro-Boot-R36H.ps1 IdentifyPanel-Offline/
+          cp docs/R36H_FIRST_BOOT.md IdentifyPanel-Offline/LEIA-ME-PRIMEIRO-BOOT.md
           cp tools/prepare_first_boot.py IdentifyPanel-Offline/tools/
           cp tools/importpanel.py IdentifyPanel-Offline/tools/
           python -m pip install --disable-pip-version-check --no-compile --target IdentifyPanel-Offline/tools/vendor "fdt==0.3.3"
