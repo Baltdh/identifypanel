@@ -177,7 +177,7 @@ class TransactionalPanelTests(unittest.TestCase):
 
     def test_boot_info_reports_boot_script_without_modifying_it(self):
         script = self.root / "boot.ini"
-        original = "load mmc 1:1 ${dtbo_loadaddr} overlays/mipi-panel.dtbo\nfdt apply ${dtbo_loadaddr}\n"
+        original = "load mmc 1:1 ${dtbo_loadaddr} overlays/mipi-panel.dtbo\nfdt apply ${dtbo_loadaddr}\nfatload mmc 1:1 ${loadaddr} trial.flag\nfatwrite mmc 1:1 ${loadaddr} trial.flag\nsaveenv\n"
         script.write_text(original, encoding="utf-8")
         output = io.StringIO()
         with redirect_stdout(output):
@@ -186,6 +186,9 @@ class TransactionalPanelTests(unittest.TestCase):
         self.assertIn("boot.ini", report)
         self.assertIn("mipi-panel.dtbo", report)
         self.assertIn("Comando/aplicação FDT detectado: sim", report)
+        self.assertIn("Capacidade referenciada — gravação FAT (fatwrite): sim", report)
+        self.assertIn("Capacidade referenciada — persistência de ambiente U-Boot (saveenv): sim", report)
+        self.assertIn("não confirma que o U-Boot instalado os tenha habilitados", report)
         self.assertEqual(script.read_text(encoding="utf-8"), original)
 
 
