@@ -62,6 +62,7 @@ Por isso, **pressionar Reset sozinho não faz rollback automático nesta versão
 
 - Mantém um backup do overlay original, sem sobrescrevê-lo a cada teste.
 - Guarda o overlay anterior de cada tentativa para permitir rollback.
+- Confere o SHA-256 de cada DTBO do catálogo contra `profiles/official/manifest.json` antes de listar ou preparar o teste; arquivos alterados ou manifesto inconsistente são recusados.
 - Instala cópias verificadas atomicamente e registra SHA-256, estado pendente, confirmação manual ou rejeição.
 - Recusa manifesto inválido e alguns caminhos de link simbólico que podem desviar as gravações.
 - Não altera o DTB principal.
