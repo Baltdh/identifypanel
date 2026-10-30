@@ -136,6 +136,41 @@ def active_extlinux_value(text: str, directive: str) -> list[str]:
     return values
 
 
+def pin_extlinux_fdt(text: str, base_relative: str) -> tuple[str, bool]:
+    """Add one explicit FDT directive when extlinux currently relies on U-Boot auto-detection."""
+    if not base_relative or base_relative.startswith("/") or ".." in Path(base_relative).parts:
+        raise PreparationError("Caminho relativo do DTB base inválido para extlinux.conf.")
+    if re.search(r"[\\s#]", base_relative):
+        raise PreparationError(
+            "O caminho do DTB base contém espaço ou '#'; o parser extlinux do U-Boot pode falhar."
+        )
+    fdt_values = active_extlinux_value(text, "FDT")
+    if len(fdt_values) > 1:
+        raise PreparationError("extlinux.conf contém várias diretivas FDT ativas.")
+    if fdt_values:
+        current = fdt_values[0].split()
+        if len(current) != 1 or current[0] != "/" + base_relative:
+            raise PreparationError(
+                "A diretiva FDT existente não corresponde ao DTB base validado; "
+                "não vou substituí-la automaticamente."
+            )
+        return text, False
+
+    lines = text.splitlines(keepends=True)
+    overlay_indices = [
+        i for i, raw in enumerate(lines)
+        if re.match(r"^\\s*FDTOVERLAYS\\s+", raw.split("#", 1)[0].strip(), re.IGNORECASE)
+    ]
+    if len(overlay_indices) != 1:
+        raise PreparationError(
+            "Não foi possível localizar uma única diretiva FDTOVERLAYS para inserir FDT."
+        )
+    newline = "\\r\\n" if "\\r\\n" in text else "\\n"
+    directive = f"  FDT /{base_relative}{newline}"
+    lines.insert(overlay_indices[0], directive)
+    return "".join(lines), True
+
+
 def safe_path(root: Path, value: str, label: str) -> Path:
     candidate = Path(value)
     if candidate.is_absolute():
@@ -253,21 +288,29 @@ def main() -> int:
                 "extlinux.conf contém várias diretivas FDT. O script não identifica "
                 "qual entrada será selecionada pelo U-Boot; não vou escolher a primeira."
             )
+        extlinux_after = extlinux_text
+        fdt_will_be_pinned = False
         if args.base_dtb:
             base = safe_path(boot, args.base_dtb, "DTB base")
             if len(fdt_values) == 1:
-                fdt_declared = fdt_values[0].split()[0]
-                declared_path = safe_path(boot, fdt_declared.lstrip("/"), "DTB indicado por FDT")
+                fdt_tokens = fdt_values[0].split()
+                if len(fdt_tokens) != 1:
+                    raise PreparationError("A diretiva FDT deve apontar para exatamente um arquivo DTB.")
+                declared_path = safe_path(boot, fdt_tokens[0].lstrip("/"), "DTB indicado por FDT")
                 if declared_path != base:
                     raise PreparationError(
                         f"--base-dtb ({base.name}) não coincide com FDT ({declared_path.name})."
                     )
+            else:
+                base_relative = base.relative_to(boot).as_posix()
+                extlinux_after, fdt_will_be_pinned = pin_extlinux_fdt(
+                    extlinux_text, base_relative
+                )
         else:
             if len(fdt_values) != 1 or len(fdt_values[0].split()) != 1:
                 raise PreparationError(
                     "extlinux.conf não seleciona um único DTB por FDT. "
-                    "Informe --base-dtb com o arquivo que o U-Boot realmente carrega; "
-                    "não vou adivinhar pelo nome do aparelho."
+                    "Informe --base-dtb com o arquivo da imagem que deve ser fixado para o primeiro boot."
                 )
             base = safe_path(boot, fdt_values[0].split()[0].lstrip("/"), "DTB indicado por FDT")
 
@@ -374,6 +417,10 @@ def main() -> int:
                 "extlinux": {
                     "file": "extlinux/extlinux.conf",
                     "overlay_directive": overlay_values[0],
+                    "fdt_directive": "/" + base.relative_to(boot).as_posix(),
+                    "fdt_pinned_by_identifypanel": fdt_will_be_pinned,
+                    "sha256_before": hashlib.sha256(extlinux_text.encode("utf-8")).hexdigest(),
+                    "sha256_after": hashlib.sha256(extlinux_after.encode("utf-8")).hexdigest(),
                 },
                 "install_state": "preview_only" if not args.install else "to_be_installed",
                 "note": (
@@ -389,6 +436,10 @@ def main() -> int:
             print(f"Alvo do overlay: {target_path}")
             print(f"Destino: {dest}")
             print(f"SHA-256 DTBO: {manifest['overlay']['sha256']}")
+            if fdt_will_be_pinned:
+                print(f"FDT será fixado em extlinux.conf: /{base.relative_to(boot).as_posix()}")
+            else:
+                print("FDT já está explicitamente definido; extlinux.conf não precisará mudar.")
 
             if not args.install:
                 print("\nNenhum arquivo foi alterado. Revise os dados e rode novamente com --install.")
@@ -397,8 +448,16 @@ def main() -> int:
             overlay_dir.mkdir(parents=True, exist_ok=True)
             backup = backup_existing(dest)
             manifest_backup = backup_existing(manifest_path)
+            extlinux_backup = backup_existing(extlinux) if fdt_will_be_pinned else None
             try:
                 atomic_write(dest, overlay_data)
+                if fdt_will_be_pinned:
+                    atomic_write(extlinux, extlinux_after.encode("utf-8"))
+                    written_extlinux = extlinux.read_text(encoding="utf-8", errors="replace")
+                    if active_extlinux_value(written_extlinux, "FDT") != [
+                        "/" + base.relative_to(boot).as_posix()
+                    ]:
+                        raise PreparationError("A diretiva FDT não foi gravada corretamente em extlinux.conf.")
                 if sha256_file(dest) != manifest["overlay"]["sha256"]:
                     raise PreparationError(
                         "A verificação pós-gravação falhou. O overlay instalado não corresponde ao gerado."
@@ -431,7 +490,7 @@ def main() -> int:
             if manifest_backup:
                 print(f"Manifesto anterior preservado em: {manifest_backup}")
             print(f"Manifesto: {manifest_path}")
-            print("Ejete o cartão com segurança. Nenhum DTB base ou setor do U-Boot foi modificado.")
+            print("Ejete o cartão com segurança. Nenhum DTB base, boot.scr, boot.ini ou setor do U-Boot foi modificado.")
             return 0
 
     except (OSError, PreparationError, subprocess.SubprocessError) as exc:
