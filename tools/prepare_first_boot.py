@@ -470,6 +470,10 @@ def main() -> int:
                     str(manifest_backup.relative_to(boot)).replace("\\", "/")
                     if manifest_backup else None
                 )
+                manifest["extlinux"]["backup"] = (
+                    str(extlinux_backup.relative_to(boot)).replace("\\", "/")
+                    if extlinux_backup else None
+                )
                 manifest_payload = (json.dumps(manifest, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
                 atomic_write(manifest_path, manifest_payload)
             except Exception:
@@ -479,6 +483,8 @@ def main() -> int:
                     atomic_write(dest, backup.read_bytes())
                 else:
                     dest.unlink(missing_ok=True)
+                if extlinux_backup:
+                    atomic_write(extlinux, extlinux_backup.read_bytes())
                 if manifest_backup:
                     atomic_write(manifest_path, manifest_backup.read_bytes())
                 else:
@@ -489,6 +495,8 @@ def main() -> int:
                 print(f"Overlay anterior preservado em: {backup}")
             if manifest_backup:
                 print(f"Manifesto anterior preservado em: {manifest_backup}")
+            if extlinux_backup:
+                print(f"extlinux.conf original preservado em: {extlinux_backup}")
             print(f"Manifesto: {manifest_path}")
             print("Ejete o cartão com segurança. Nenhum DTB base, boot.scr, boot.ini ou setor do U-Boot foi modificado.")
             return 0
