@@ -1,6 +1,16 @@
 name: Build offline IdentifyPanel package
 on:
   workflow_dispatch:
+  push:
+    branches: [autopanel-core]
+    paths:
+      - ".github/workflows/fetch-profiles.yml"
+      - "identifypanel.py"
+      - "Selecionar-Tela.sh"
+      - "README.md"
+      - "tools/**"
+      - "tests/**"
+      - "docs/**"
   schedule:
     - cron: "17 8 1 * *"
 permissions:
