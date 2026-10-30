@@ -29,7 +29,7 @@ jobs:
         run: python tools/fetch_official_profiles.py --output profiles/official
       - name: Verify manifest, hashes, FDT files, and shell syntax
         run: |
-          python -m py_compile identifypanel.py tools/fetch_official_profiles.py tools/select_profile.py
+          python -m py_compile identifypanel.py tools/fetch_official_profiles.py tools/select_profile.py tools/prepare_first_boot.py tools/importpanel.py
           sh -n Selecionar-Tela.sh
           python -m unittest discover -s tests -v
           python identifypanel.py profiles --profiles profiles/official
@@ -78,11 +78,31 @@ jobs:
           cp README.md IdentifyPanel-Offline/
           cp Selecionar-Tela.sh IdentifyPanel-Offline/
           cp tools/select_profile.py IdentifyPanel-Offline/tools/
+          cp tools/prepare_first_boot.py IdentifyPanel-Offline/tools/
+          cp tools/importpanel.py IdentifyPanel-Offline/tools/
           cp -r profiles/official IdentifyPanel-Offline/profiles/
           chmod +x IdentifyPanel-Offline/Selecionar-Tela.sh
           cat > IdentifyPanel-Offline/LEIA-ME-OFFLINE.txt <<'EOF'
-          IDENTIFYPANEL — MENU SHELL DE SELEÇÃO DE TELA
+          IDENTIFYPANEL — PRIMEIRO BOOT NO R36H E MENU OFFLINE
           
+          PARTE A — PREPARAR A PRIMEIRA INICIALIZAÇÃO NO PC (RECOMENDADO)
+          Esta etapa não exige que o R36H tenha um sistema funcionando.
+          1. Preserve o cartão/backup DarkOS que funcionava.
+          2. Extraia da instalação antiga o DTB Linux efetivamente usado pela tela.
+          3. Grave a imagem ROCKNIX RK3326 em um cartão de teste, mas não ligue o console.
+          4. No PC, monte a partição de boot e verifique extlinux/extlinux.conf.
+          5. Instale Python 3 e a dependência do importador no PC:
+             python -m pip install fdt
+          6. Se extlinux.conf declarar um único FDT explícito:
+             python tools/prepare_first_boot.py --stock-dtb CAMINHO_DO_DTB_DARKOS --boot CAMINHO_DA_PARTICAO_BOOT --install
+             Caso contrário, informe --base-dtb CAMINHO_RELATIVO_DO_DTB_BASE que o U-Boot realmente selecionará.
+          7. O programa gera o overlay com o importador ROCKNIX, verifica o alvo no DTB base,
+             guarda backup do overlay anterior e instala overlays/mipi-panel.dtbo.
+          8. Ejete o cartão com segurança. Só então faça o primeiro boot.
+          NÃO escolha o DTB base pelo nome do console; confirme a seleção do boot script.
+          Se a imagem não selecionar um DTB de forma verificável, pare e inspecione no PC.
+          
+          PARTE B — MENU DE TESTE PÓS-BOOT (quando o ROCKNIX já inicia)
           1. Extraia a pasta completa no cartão/armazenamento.
           2. Abra um terminal no ROCKNIX e execute:
              cd /CAMINHO/IdentifyPanel-Offline
@@ -94,20 +114,13 @@ jobs:
              e só então escolha o próximo perfil.
           7. Use R para restaurar o overlay original anterior à primeira tentativa.
           
-          O arquivo de origem em profiles/official nunca é renomeado. Uma cópia validada
-          é instalada como overlays/mipi-panel.dtbo. O estado de cada teste e os hashes
-          ficam em .identifypanel/manifest.json. O perfil só é marcado como confirmado
-          após a ação manual C; o programa não detecta pixels do LCD.
-          Use I no menu para inspecionar boot.ini, extlinux.conf e outros arquivos de boot
-          sem modificá-los; isso ajuda a definir uma futura recuperação pré-kernel segura.
+          IMPORTANTE: o menu pós-boot não executa se a falha ocorre antes do sistema iniciar.
+          Reset sozinho NÃO faz rollback automático. A preparação da Parte A é o caminho
+          para configurar o painel antes do primeiro boot. O pacote ainda não implementa
+          troca automática de DTBOs no U-Boot.
           
-          IMPORTANTE: o menu roda depois que o ROCKNIX iniciou. Se o kernel travar ou a
-          tela impedir o acesso ao menu, Reset sozinho NÃO executará rollback. Será
-          necessário recuperar a partição usando outro computador/sistema ou leitor
-          de cartão. Um seletor pré-boot requer adaptar e validar o bootloader real.
-          
-          Os DTBOs são candidatos estruturais publicados para outros modelos; não há
-          garantia de compatibilidade física com R36H. Preserve o cartão original.
+          Os DTBOs de profiles/official são candidatos estruturais, não certificados para R36H.
+          Preserve o cartão original. Não grave DTB base, boot.scr ou setores raw do U-Boot.
           EOF
           cp profiles/official/manifest.json IdentifyPanel-Offline/
           cd IdentifyPanel-Offline
