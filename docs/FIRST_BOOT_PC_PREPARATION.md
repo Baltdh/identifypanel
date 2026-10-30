@@ -51,6 +51,16 @@ Fontes:
 
 **Conclusão prática:** a informação de que Panel 4 funcionava no DarkOS é útil, mas a melhor fonte é o DTB Linux efetivamente utilizado pelo DarkOS que funcionava no seu aparelho. Não escolha um perfil apenas pelo nome do painel quando podemos importar os parâmetros originais.
 
+## Imagem ROCKNIX de partida recomendada
+
+Para a primeira tentativa, a opção estável publicada em 1º de outubro de 2026 é `ROCKNIX-RK3326.aarch64-20261001-a.img.gz`. A tabela oficial inclui Game Console R36S na variante **A**; a variante B é destinada a outros dispositivos RK3326. SHA-256 oficial da imagem A:
+
+`d693d2bb3cd854a54a1c742c9952f20892c8344188c696beea00c77b5bd54392`
+
+A página comunitária específica do R36H relata que a imagem R36S funciona no R36H, mas também diz explicitamente que o R36H não tem suporte oficial ROCKNIX. Portanto, este é o ponto de partida documentado, não uma imagem oficialmente certificada para R36H.
+
+Fonte oficial de releases: https://github.com/ROCKNIX/distribution/releases
+
 ## Procedimento recomendado
 
 ### 1. Extrair o DTB original do DarkOS
